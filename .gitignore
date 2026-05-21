@@ -1,0 +1,24 @@
+# Secrets
+.env
+*servicekey*.json
+*credentials.json
+
+# Claude & IDE
+.claude/
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Docs & notes
+*.md
+!README.md
+*.txt
+
+# Logs & cache
+*.log
+.*_cache.json
+.DS_Store
