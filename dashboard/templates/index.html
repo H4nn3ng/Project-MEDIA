@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Money Psychology</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+
+<!-- ═══ TOP BAR ═══ -->
+<header id="topbar">
+  <div class="topbar-left">
+    <span class="logo">Money Psychology</span>
+    <span class="logo-ver">v1.0 · pipeline</span>
+  </div>
+  <div class="topbar-right">
+    <div id="status-pill" class="status-pill idle">
+      <span class="status-dot idle" id="status-dot"></span>
+      <span id="status-text">No run in progress</span>
+      <span id="elapsed" class="elapsed"></span>
+    </div>
+    <div id="api-calls-chip" class="api-calls-chip" style="display:none">
+      <span class="api-calls-icon">⚡</span>
+      <span id="api-calls-count">0</span>
+      <span class="api-calls-label">API calls</span>
+    </div>
+    <button id="btn-stop" class="btn btn-outline btn-sm" disabled onclick="App.stop()">■ Stop</button>
+    <button id="btn-log" class="btn-log" onclick="App.toggleLog()">
+      <span class="btn-log-icon"></span>
+      <span id="btn-log-label">Show log</span>
+    </button>
+  </div>
+</header>
+
+<!-- ═══ RAIL ═══ -->
+<nav id="rail">
+  <div class="rail-section-label">Pipeline</div>
+
+  <button class="nav-btn active" data-stage="pipeline" onclick="App.nav('pipeline')">
+    <span class="nav-num">1</span>
+    <div class="nav-text">
+      <span class="nav-name">Scrape</span>
+      <span class="nav-sub">collect raw assets</span>
+    </div>
+    <span class="nav-stage-dot" id="dot-pipeline"></span>
+  </button>
+
+  <button class="nav-btn" data-stage="footage" onclick="App.nav('footage')">
+    <span class="nav-num">2</span>
+    <div class="nav-text">
+      <span class="nav-name">Sort Media</span>
+      <span class="nav-sub">footage · audio · images</span>
+    </div>
+    <span class="nav-stage-dot" id="dot-footage"></span>
+  </button>
+
+  <button class="nav-btn" data-stage="render" onclick="App.nav('render')">
+    <span class="nav-num">3</span>
+    <div class="nav-text">
+      <span class="nav-name">Render</span>
+      <span class="nav-sub">compose posts</span>
+    </div>
+    <span class="nav-stage-dot" id="dot-render"></span>
+  </button>
+
+  <button class="nav-btn" data-stage="finalreview" onclick="App.nav('finalreview')">
+    <span class="nav-num">4</span>
+    <div class="nav-text">
+      <span class="nav-name">Approve to Post</span>
+      <span class="nav-sub">final review</span>
+    </div>
+    <span class="nav-stage-dot" id="dot-finalreview"></span>
+  </button>
+
+  <button class="nav-btn" data-stage="corpus" onclick="App.nav('corpus')">
+    <span class="nav-num">5</span>
+    <div class="nav-text">
+      <span class="nav-name">Corpus</span>
+      <span class="nav-sub">85 concepts</span>
+    </div>
+    <span class="nav-stage-dot" id="dot-corpus"></span>
+  </button>
+
+  <button class="nav-btn" data-stage="intelligence" onclick="App.nav('intelligence')">
+    <span class="nav-num">6</span>
+    <div class="nav-text">
+      <span class="nav-name">Intelligence</span>
+      <span class="nav-sub">signals · keywords</span>
+    </div>
+    <span class="nav-stage-dot" id="dot-intelligence"></span>
+  </button>
+
+  <div class="rail-batch" id="rail-batch">
+    <div class="rail-batch-eyebrow">Pool · footage</div>
+    <div class="rail-batch-value" id="rail-batch-value">—</div>
+    <div class="rail-batch-bar"><div class="rail-batch-fill" id="rail-batch-fill" style="width:0%"></div></div>
+    <div class="rail-batch-sub" id="rail-batch-sub">approved clips</div>
+  </div>
+</nav>
+
+<!-- ═══ CONTENT ═══ -->
+<div id="layout">
+
+  <!-- ── 1 · SCRAPE ── -->
+  <section id="stage-pipeline" class="stage active">
+
+    <div class="stage-header">
+      <div>
+        <div class="stage-eyebrow">Stage 01</div>
+        <h2 class="stage-title">Scrape</h2>
+      </div>
+      <div class="stage-desc">Pull behavioral finance footage, background music, and stock images from Pexels, Pixabay, Coverr, Freesound, and Jamendo. Score every candidate against the corpus.</div>
+    </div>
+
+    <!-- Overview strip -->
+    <div class="overview-strip" id="overview-strip">
+      <div class="stat-tile">
+        <div class="stat-tile-label">Staging · footage</div>
+        <div class="stat-tile-value">
+          <span class="stat-tile-num" id="ov-staging">—</span>
+          <span class="stat-tile-sub">awaiting review</span>
+        </div>
+        <div class="stat-tile-dot"></div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-tile-label">Pool · footage</div>
+        <div class="stat-tile-value">
+          <span class="stat-tile-num" id="ov-footage">—</span>
+          <span class="stat-tile-sub">approved clips</span>
+        </div>
+        <div class="stat-tile-dot"></div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-tile-label">Pool · audio</div>
+        <div class="stat-tile-value">
+          <span class="stat-tile-num" id="ov-audio">—</span>
+          <span class="stat-tile-sub">tracks</span>
+        </div>
+        <div class="stat-tile-dot"></div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-tile-label">Ready to post</div>
+        <div class="stat-tile-value">
+          <span class="stat-tile-num" id="ov-ready">—</span>
+          <span class="stat-tile-sub" id="ov-ready-sub"></span>
+        </div>
+        <div class="stat-tile-dot" style="background:var(--sage)"></div>
+      </div>
+    </div>
+
+    <!-- Run card -->
+    <div class="mode-grid">
+      <div class="mode-card">
+        <div class="card-eyebrow">Phase 1</div>
+        <h3 class="card-title-serif">Scrape &amp; Score</h3>
+        <p>Fetch concept-matched footage, background music, and stock images. Score all candidates with Flash-Lite. Fact-check top external concepts with Flash.</p>
+        <div class="mode-card-meta">
+          <span>~5–8 min · kills at 12</span><span class="dot">·</span>
+          <span>Mon / Thu</span>
+        </div>
+        <button class="btn btn-primary btn-lg" id="btn-run-scrape" onclick="App.run('scrape')" style="width:100%">Run scrape</button>
+      </div>
+      <div class="mode-card">
+        <div class="card-eyebrow">Phase 3</div>
+        <h3 class="card-title-serif">Render</h3>
+        <p>Pick next concept from corpus, generate edit plan with Pro, pass fact-check gate, render reel or carousel. Uses footage from pool.</p>
+        <div class="mode-card-meta">
+          <span>~5–8 min · kills at 10</span><span class="dot">·</span>
+          <span>after sort media</span>
+        </div>
+        <button class="btn btn-outline btn-lg" id="btn-run-render" onclick="App.run('render')" style="width:100%">Run render</button>
+      </div>
+    </div>
+
+    <!-- Pipeline steps -->
+    <div class="section-eyebrow" style="display:flex;justify-content:space-between;align-items:center">
+      <span>Pipeline</span>
+      <span id="step-live-label" style="font:400 11px var(--sans);color:var(--muted);letter-spacing:.4px;text-transform:none"></span>
+    </div>
+    <div class="steps-row" id="steps-full"></div>
+
+    <div class="divider"></div>
+
+    <div id="last-run-recap" class="run-recap" style="display:none">
+      <div class="run-recap-header">
+        <span class="run-recap-label" id="recap-label">Last run</span>
+        <span class="pill" id="recap-pill">—</span>
+      </div>
+      <div class="run-recap-nums" id="recap-nums"></div>
+    </div>
+
+  </section>
+
+  <!-- ── 2 · SORT MEDIA ── -->
+  <section id="stage-footage" class="stage">
+
+    <div class="footage-header">
+      <div>
+        <div class="stage-eyebrow">Stage 02</div>
+        <h2 class="stage-title">Sort media</h2>
+      </div>
+    </div>
+
+    <div class="media-tabs">
+      <button class="media-tab active" id="tab-footage" onclick="App.footage.setType('footage')">
+        Video footage <span class="tab-count" id="tab-count-footage"></span>
+      </button>
+      <button class="media-tab" id="tab-audio" onclick="App.footage.setType('audio')">
+        Audio <span class="tab-count" id="tab-count-audio"></span>
+      </button>
+      <button class="media-tab" id="tab-images" onclick="App.footage.setType('images')">
+        Images <span class="tab-count" id="tab-count-images"></span>
+      </button>
+      <div class="tab-actions">
+        <button class="btn btn-primary btn-sm" id="btn-footage-commit"
+                onclick="App.footage.commit()" disabled>Commit →</button>
+      </div>
+    </div>
+
+    <div id="footage-progress-wrap">
+      <div class="review-progress-bar">
+        <div class="prog-kept" id="prog-kept" style="width:0%"></div>
+        <div class="prog-rej"  id="prog-rej"  style="width:0%"></div>
+      </div>
+      <div class="review-progress-label" id="footage-prog-label">—</div>
+    </div>
+
+    <div class="review-cols" id="footage-reviewer">
+      <div class="detail-empty" style="grid-column:1/-1">Loading…</div>
+    </div>
+
+    <div id="images-tab-panel" style="display:none">
+      <div class="image-grid" id="images-grid">
+        <div class="empty">Loading images…</div>
+      </div>
+      <div class="rejected-toggle-row">
+        <button class="btn btn-ghost btn-sm" id="btn-show-rejected-images"
+                onclick="App.images.toggleRejected()" style="display:none">↩ Rejected</button>
+      </div>
+      <div class="image-grid" id="images-rejected-panel" style="display:none"></div>
+    </div>
+
+  </section>
+
+  <!-- ── 3 · RENDER ── -->
+  <section id="stage-render" class="stage">
+
+    <div class="stage-header">
+      <div>
+        <div class="stage-eyebrow">Stage 03</div>
+        <h2 class="stage-title">Render</h2>
+      </div>
+      <div class="stage-desc">Compose posts from approved pool material. render.py auto-selects the next concept and format (reel or carousel) from the corpus.</div>
+    </div>
+
+    <section class="pool-widget" id="pool-widget">
+      <div class="pool-widget-head">
+        <h3>Pool inventory</h3>
+        <div class="pool-widget-sub" id="pool-widget-sub">—</div>
+      </div>
+      <div id="pool-rows"></div>
+    </section>
+
+    <div class="render-cards">
+      <div class="render-card">
+        <div class="card-eyebrow">Auto-format</div>
+        <h3>Reel or Carousel</h3>
+        <p>render.py picks the next eligible concept from the corpus and alternates formats: reel → carousel → reel. Runs up to 4 artifacts per Monday, 3 per Thursday.</p>
+        <button class="btn btn-primary" id="btn-render-go" onclick="App.run('render')" style="width:100%">Run render</button>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ── 4 · APPROVE TO POST ── -->
+  <section id="stage-finalreview" class="stage">
+
+    <div class="stage-header">
+      <div>
+        <div class="stage-eyebrow">Stage 04</div>
+        <h2 class="stage-title">Approve to post</h2>
+      </div>
+    </div>
+
+    <div class="media-tabs">
+      <button class="media-tab active" id="fr-tab-reel" onclick="App.finalreview.setCategory('reel')">Reel <span class="tab-count" id="fr-count-reel"></span></button>
+      <button class="media-tab" id="fr-tab-carousel" onclick="App.finalreview.setCategory('carousel')">Carousel <span class="tab-count" id="fr-count-carousel"></span></button>
+    </div>
+
+    <div id="fr-reviewer"></div>
+
+  </section>
+
+  <!-- ── 5 · CORPUS BROWSER ── -->
+  <section id="stage-corpus" class="stage">
+
+    <div class="stage-header">
+      <div>
+        <div class="stage-eyebrow">Stage 05</div>
+        <h2 class="stage-title">Corpus</h2>
+      </div>
+      <div class="stage-desc">85 behavioral finance concepts. Each concept is used for up to two formats (reel + carousel) before retiring.</div>
+    </div>
+
+    <div class="media-tabs">
+      <button class="media-tab active" id="corpus-tab-upcoming" onclick="App.corpus.setView('upcoming')">
+        Upcoming <span class="tab-count" id="corpus-count-upcoming"></span>
+      </button>
+      <button class="media-tab" id="corpus-tab-used" onclick="App.corpus.setView('used')">
+        Used <span class="tab-count" id="corpus-count-used"></span>
+      </button>
+      <button class="media-tab" id="corpus-tab-quarantined" onclick="App.corpus.setView('quarantined')">
+        Quarantined <span class="tab-count" id="corpus-count-quarantined"></span>
+      </button>
+      <div class="tab-actions">
+        <button class="btn btn-primary btn-sm" onclick="App.corpus.openAdd()">+ Add concept</button>
+      </div>
+    </div>
+
+    <div id="corpus-list"></div>
+
+  </section>
+
+  <!-- ═══ ADD CONCEPT MODAL ═══ -->
+  <div id="concept-modal-backdrop" style="display:none" onclick="App.corpus.closeAdd()"></div>
+  <div id="concept-modal" style="display:none">
+    <div class="concept-modal-header">
+      <span class="concept-modal-title">Add concept</span>
+      <button class="concept-modal-close" onclick="App.corpus.closeAdd()">✕</button>
+    </div>
+    <div class="concept-modal-body">
+      <div class="concept-field-group">
+        <label class="concept-label">Concept name <span class="req">*</span></label>
+        <input id="cf-name" class="concept-input" type="text" placeholder="e.g. Sunk Cost Fallacy">
+      </div>
+      <div class="concept-field-group">
+        <label class="concept-label">Definition <span class="req">*</span></label>
+        <textarea id="cf-definition" class="concept-textarea" rows="2" placeholder="One or two sentences explaining what this concept is."></textarea>
+      </div>
+      <div class="concept-field-group">
+        <label class="concept-label">Mechanism <span class="opt">(optional)</span></label>
+        <textarea id="cf-mechanism" class="concept-textarea" rows="2" placeholder="Why does the brain do this? What's the underlying psychology?"></textarea>
+      </div>
+      <div class="concept-field-group">
+        <label class="concept-label">Visual search terms <span class="req">*</span></label>
+        <input id="cf-visual" class="concept-input" type="text" placeholder="wallet, credit card, price tag, shopping cart, budget spreadsheet">
+        <div class="concept-hint">Comma-separated. These drive the footage search — be specific and visual.</div>
+      </div>
+      <div class="concept-field-group">
+        <label class="concept-label">Scenarios <span class="opt">(up to 3, optional)</span></label>
+        <input id="cf-s1" class="concept-input" type="text" placeholder="Scenario 1 — a real-world example">
+        <input id="cf-s2" class="concept-input" style="margin-top:6px" type="text" placeholder="Scenario 2">
+        <input id="cf-s3" class="concept-input" style="margin-top:6px" type="text" placeholder="Scenario 3">
+      </div>
+      <div class="concept-field-group">
+        <label class="concept-label">Academic source <span class="opt">(optional)</span></label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <input id="cf-src-author" class="concept-input" type="text" placeholder="Author(s)">
+          <input id="cf-src-year"   class="concept-input" type="number" placeholder="Year">
+        </div>
+        <input id="cf-src-work" class="concept-input" style="margin-top:8px" type="text" placeholder="Title of paper or book">
+        <input id="cf-src-url"  class="concept-input" style="margin-top:6px" type="text" placeholder="URL (optional)">
+      </div>
+    </div>
+    <div class="concept-modal-footer">
+      <span id="concept-add-error" class="concept-error"></span>
+      <button class="btn btn-outline btn-sm" onclick="App.corpus.closeAdd()">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="concept-add-btn" onclick="App.corpus.submitAdd()">Add to corpus</button>
+    </div>
+  </div>
+
+  <!-- ── 6 · INTELLIGENCE ── -->
+  <section id="stage-intelligence" class="stage">
+
+    <div class="stage-header">
+      <div>
+        <div class="stage-eyebrow">Stage 06</div>
+        <h2 class="stage-title">Intelligence</h2>
+      </div>
+      <div class="stage-desc">Signals from footage and render history — what visual keywords and tags perform well.</div>
+    </div>
+
+    <div class="intel-card" id="intel-card-keywords">
+      <div class="intel-card-head">
+        <h3>Visual Keywords</h3>
+        <div class="intel-card-meta" id="intel-keywords-meta">—</div>
+      </div>
+      <div class="intel-split">
+        <div>
+          <div class="intel-col-head is-high"><span class="intel-col-mark">✓</span> Performing<span class="intel-col-count" id="intel-keywords-high-count">0</span></div>
+          <div class="intel-chips" id="intel-keywords-high"></div>
+        </div>
+        <div>
+          <div class="intel-col-head is-low"><span class="intel-col-mark">✗</span> Avoid<span class="intel-col-count" id="intel-keywords-low-count">0</span></div>
+          <div class="intel-chips" id="intel-keywords-low"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="intel-card" id="intel-card-tags">
+      <div class="intel-card-head">
+        <h3>Platform Tags</h3>
+        <div class="intel-card-meta" id="intel-tags-meta">—</div>
+      </div>
+      <div class="intel-split">
+        <div>
+          <div class="intel-col-head is-high"><span class="intel-col-mark">✓</span> Performing<span class="intel-col-count" id="intel-tags-high-count">0</span></div>
+          <div class="intel-chips intel-chips-sm" id="intel-tags-high"></div>
+        </div>
+        <div>
+          <div class="intel-col-head is-low"><span class="intel-col-mark">✗</span> Avoid<span class="intel-col-count" id="intel-tags-low-count">0</span></div>
+          <div class="intel-chips intel-chips-sm" id="intel-tags-low"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="intel-foot" id="intel-foot"></div>
+  </section>
+
+</div><!-- #layout -->
+
+<!-- ═══ LOG DRAWER ═══ -->
+<div id="log-drawer">
+  <div id="log-resize-handle" title="Drag to resize"></div>
+  <div id="log-handle" onclick="App.toggleLog()">
+    <div class="log-handle-left">
+      <span class="log-handle-name">pipeline.log</span>
+      <span class="log-handle-run" id="log-run-label">—</span>
+    </div>
+    <div class="log-handle-right">
+      <span class="log-lines-count" id="log-count">0 lines</span>
+    </div>
+  </div>
+  <div id="log-lines"></div>
+</div>
+
+<!-- ═══ IMAGE LIGHTBOX ═══ -->
+<div id="img-lightbox" class="lightbox" style="display:none" onclick="App.images.lightboxBgClick(event)">
+  <button class="lightbox-nav" id="lightbox-prev" onclick="App.images.lightboxNav(-1)">&#8249;</button>
+  <img class="lightbox-img" id="lightbox-img" src="" alt="">
+  <button class="lightbox-nav" id="lightbox-next" onclick="App.images.lightboxNav(1)">&#8250;</button>
+  <button class="lightbox-close" onclick="App.images.closeLightbox()">&#x2715;</button>
+  <span class="lightbox-counter" id="lightbox-counter"></span>
+  <div class="lightbox-rate-bar">
+    <button class="lightbox-rate-btn keep" id="lightbox-rate-g"
+            onclick="event.stopPropagation();App.images.rateInLightbox('g')">✓ Keep</button>
+    <button class="lightbox-rate-btn reject" id="lightbox-rate-b"
+            onclick="event.stopPropagation();App.images.rateInLightbox('b')">✗ Reject</button>
+  </div>
+</div>
+
+<!-- ═══ CAROUSEL SLIDE LIGHTBOX ═══ -->
+<div id="carousel-lightbox" class="lightbox" style="display:none" onclick="App.finalreview.slideshowBgClick(event)">
+  <button class="lightbox-nav" id="cs-lightbox-prev" onclick="App.finalreview.slideshowNav(-1)">&#8249;</button>
+  <img class="lightbox-img" id="cs-lightbox-img" src="" alt="">
+  <button class="lightbox-nav" id="cs-lightbox-next" onclick="App.finalreview.slideshowNav(1)">&#8250;</button>
+  <button class="lightbox-close" onclick="App.finalreview.closeSlideshow()">&#x2715;</button>
+  <span class="lightbox-counter" id="cs-lightbox-counter"></span>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

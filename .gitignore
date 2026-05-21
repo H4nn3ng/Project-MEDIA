@@ -1,0 +1,60 @@
+# Secrets & credentials
+.env
+.env.example
+.env.local
+*servicekey.json
+*credentials.json
+*service_account*.json
+
+# Data & media (large binary files)
+data/
+*.mp4
+*.mp3
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.wav
+*.tmp
+*.onnx
+*.bin
+
+# Runtime & intelligence state
+batch/
+runs/
+pool/
+
+# Virtual environments
+venv/
+.venv/
+mp_env/
+
+# Variable/intelligence files
+variable agent*
+
+# Documentation & workflow notes
+workflow_moneypsy/
+*.md
+*.txt
+
+# IDE & tool configs
+.vscode/
+.claude/
+.obsidian/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Corpus & world files
+world_bible.json
+corpus/concepts.json
+corpus/seed_review.txt
+
+# Schema examples (content data, not structure)
+schemas/*.examples.json
+
+# Logs & cache
+*.log
+.*_cache.json

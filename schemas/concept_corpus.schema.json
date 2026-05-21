@@ -1,0 +1,146 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "money-psychology/schemas/concept_corpus.schema.json",
+  "title": "ConceptCorpus",
+  "description": "The concept corpus is the canonical store of behavioral-finance concepts the channel covers. Each entry is one concept. Seeded entries are operator-curated; externally-promoted entries are added by the ingestion fact-check agent.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Schema version, e.g. '1.0.0'."
+    },
+    "last_updated": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "concepts": {
+      "type": "object",
+      "description": "Map of concept_id → ConceptEntry. concept_id is a slug.",
+      "additionalProperties": {
+        "$ref": "#/definitions/ConceptEntry"
+      }
+    }
+  },
+  "required": ["version", "concepts"],
+  "definitions": {
+    "ConceptEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "concept_id",
+        "canonical_name",
+        "definition",
+        "provenance",
+        "created_at"
+      ],
+      "properties": {
+        "concept_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+$",
+          "description": "Slug. Stable across renames. Example: 'loss_aversion'."
+        },
+        "canonical_name": {
+          "type": "string",
+          "description": "The canonical display name. Example: 'Loss Aversion'."
+        },
+        "alternate_names": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Other names this concept goes by. Used by ingestion match step."
+        },
+        "definition": {
+          "type": "string",
+          "description": "One-sentence definition, 15-30 words. Used as ground truth for definitional claims in fact-check."
+        },
+        "canonical_source": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["author", "work"],
+              "properties": {
+                "author": { "type": "string" },
+                "work": { "type": "string" },
+                "year": { "type": ["string", "number", "null"] },
+                "url": { "type": ["string", "null"] }
+              }
+            }
+          ],
+          "description": "Origin citation. Null for folk concepts (e.g., 'lifestyle creep')."
+        },
+        "scenarios": {
+          "type": "array",
+          "description": "Recognizable real-world scenarios that demonstrate the concept. Editor draws from these to write hooks and bodies. 2-5 entries.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["text"],
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "1-2 sentences describing a relatable scenario."
+              },
+              "tags": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          },
+          "minItems": 1
+        },
+        "mechanism": {
+          "type": "string",
+          "description": "1-2 sentence explanation of why the bias happens psychologically. Used in the 'reveal' beat."
+        },
+        "visual_concepts": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Search vocabulary for visual asset acquisition. Example: ['shopping cart', 'gym membership card', 'unused subscription'].",
+          "minItems": 1
+        },
+        "format_used": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["reel", "carousel"]
+          },
+          "description": "Formats this concept has already been published in. Editor avoids re-using same format until 90-day cooldown."
+        },
+        "provenance": {
+          "type": "string",
+          "enum": ["seeded", "external_promoted"],
+          "description": "Who put this entry in the corpus. Seeded = operator hand-curated. External_promoted = ingestion fact-check approved."
+        },
+        "provisional": {
+          "type": "boolean",
+          "description": "True for new external_promoted entries until first artifact succeeds review. Cleared on first thumbs-up.",
+          "default": false
+        },
+        "quarantined": {
+          "type": "boolean",
+          "description": "True if 2-strike threshold reached on artifact rejections. Excluded from selection.",
+          "default": false
+        },
+        "strikes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Rejection count for external_promoted entries. Reset on thumbs-up."
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "last_used_at": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "source_candidate_id": {
+          "type": ["string", "null"],
+          "description": "For external_promoted entries: the Candidate.id that triggered promotion."
+        }
+      }
+    }
+  }
+}
