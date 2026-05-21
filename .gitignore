@@ -35,6 +35,7 @@ agent1/
 workflow_md/
 md/
 *.md
+!README.md
 *.txt
 
 # IDE & tool configs
