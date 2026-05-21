@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Healing Agent</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+
+<!-- ═══ TOP BAR ═══ -->
+<header id="topbar">
+  <div class="topbar-left">
+    <span class="logo">Healing Agent</span>
+    <span class="logo-ver">v0.6 · maple</span>
+  </div>
+  <div class="topbar-right">
+    <span id="batch-label" class="batch-label"></span>
+    <div id="status-pill" class="status-pill idle">
+      <span class="status-dot idle" id="status-dot"></span>
+      <span id="status-text">No run in progress</span>
+      <span id="elapsed" class="elapsed"></span>
+    </div>
+    <button id="btn-stop" class="btn btn-outline btn-sm" disabled onclick="App.stop()">■ Stop</button>
+    <button id="btn-log" class="btn-log" onclick="App.toggleLog()">
+      <span class="btn-log-icon"></span>
+      <span id="btn-log-label">Show log</span>
+    </button>
+  </div>
+</header>
+
+<!-- ═══ RAIL ═══ -->
+<nav id="rail">
+  <div class="rail-section-label">Pipeline</div>
+
+  <button class="nav-btn active" data-stage="pipeline" onclick="App.nav('pipeline')">
+    <span class="nav-num">1</span>
+    <div class="nav-text">
+      <span class="nav-name">Scrape</span>
+      <span class="nav-sub">collect raw</span>
+    </div>
+    <span class="nav-stage-dot" id="dot-pipeline"></span>
+  </button>
+
+  <button class="nav-btn" data-stage="footage" onclick="App.nav('footage')">
+    <span class="nav-num">2</span>
+    <div class="nav-text">
+      <span class="nav-name">Sort Media</span>
+      <span class="nav-sub">footage · audio · images</span>
+    </div>
+    <span class="nav-stage-dot" id="dot-footage"></span>
+  </button>
+
+  <button class="nav-btn" data-stage="render" onclick="App.nav('render')">
+    <span class="nav-num">3</span>
+    <div class="nav-text">
+      <span class="nav-name">Render</span>
+      <span class="nav-sub">compose posts</span>
+    </div>
+    <span class="nav-stage-dot" id="dot-render"></span>
+  </button>
+
+  <button class="nav-btn" data-stage="finalreview" onclick="App.nav('finalreview')">
+    <span class="nav-num">4</span>
+    <div class="nav-text">
+      <span class="nav-name">Approve to Post</span>
+      <span class="nav-sub">final review</span>
+    </div>
+    <span class="nav-stage-dot" id="dot-finalreview"></span>
+  </button>
+
+  <button class="nav-btn" data-stage="timeline" onclick="App.nav('timeline')">
+    <span class="nav-num">5</span>
+    <div class="nav-text">
+      <span class="nav-name">Timeline</span>
+      <span class="nav-sub">weekly rhythm</span>
+    </div>
+    <span class="nav-stage-dot" id="dot-timeline"></span>
+  </button>
+
+  <button class="nav-btn" data-stage="intelligence" onclick="App.nav('intelligence')">
+    <span class="nav-num">6</span>
+    <div class="nav-text">
+      <span class="nav-name">Intelligence</span>
+      <span class="nav-sub">signals · keywords</span>
+    </div>
+    <span class="nav-stage-dot" id="dot-intelligence"></span>
+  </button>
+
+  <div class="rail-batch" id="rail-batch">
+    <div class="rail-batch-eyebrow">Pool · images</div>
+    <div class="rail-batch-value" id="rail-batch-value">—</div>
+    <div class="rail-batch-bar"><div class="rail-batch-fill" id="rail-batch-fill" style="width:0%"></div></div>
+    <div class="rail-batch-sub" id="rail-batch-sub">ready to post</div>
+  </div>
+</nav>
+
+<!-- ═══ CONTENT ═══ -->
+<div id="layout">
+
+  <!-- ── 1 · SCRAPE / PIPELINE ── -->
+  <section id="stage-pipeline" class="stage active">
+
+    <div class="stage-header">
+      <div>
+        <div class="stage-eyebrow">Stage 01</div>
+        <h2 class="stage-title">Scrape</h2>
+      </div>
+      <div class="stage-desc">Pull calming footage, audio, and photographs from open sources. Score, name, and stash for the sort stages.</div>
+    </div>
+
+    <!-- Overview strip -->
+    <div class="overview-strip" id="overview-strip">
+      <div class="stat-tile">
+        <div class="stat-tile-label">Pool · footage</div>
+        <div class="stat-tile-value">
+          <span class="stat-tile-num" id="ov-footage">—</span>
+          <span class="stat-tile-sub" id="ov-footage-sub">clips</span>
+        </div>
+        <div class="stat-tile-dot"></div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-tile-label">Pool · audio</div>
+        <div class="stat-tile-value">
+          <span class="stat-tile-num" id="ov-audio">—</span>
+          <span class="stat-tile-sub" id="ov-audio-sub">tracks</span>
+        </div>
+        <div class="stat-tile-dot"></div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-tile-label">Pool · images</div>
+        <div class="stat-tile-value">
+          <span class="stat-tile-num" id="ov-images">—</span>
+          <span class="stat-tile-sub">curated</span>
+        </div>
+        <div class="stat-tile-dot"></div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-tile-label">Ready to post</div>
+        <div class="stat-tile-value">
+          <span class="stat-tile-num" id="ov-ready">—</span>
+          <span class="stat-tile-sub" id="ov-ready-sub"></span>
+        </div>
+        <div class="stat-tile-dot" style="background:var(--sage)"></div>
+      </div>
+    </div>
+
+    <!-- Run mode cards -->
+    <div class="mode-grid">
+      <div class="mode-card">
+        <div class="card-eyebrow">Mode A</div>
+        <h3 class="card-title-serif">Full scrape</h3>
+        <p>All eight steps — climate, keywords, scripts, footage, images, audio, scoring, download. Builds tonight's pool from nothing.</p>
+        <div class="mode-card-meta">
+          <span>~30 min</span><span class="dot">·</span>
+          <span>~600 candidates</span><span class="dot">·</span>
+          <span>Mon / Wed / Fri</span>
+        </div>
+        <button class="btn btn-primary btn-lg" id="btn-run-agent" onclick="App.run('agent')" style="width:100%">Run full scrape</button>
+      </div>
+      <div class="mode-card">
+        <div class="card-eyebrow">Mode B</div>
+        <h3 class="card-title-serif">Quick content only</h3>
+        <p>Re-runs scripts + quotes against today's emotional climate. Use when the pool is fresh but you want new quote candidates.</p>
+        <div class="mode-card-meta">
+          <span>~2 min</span><span class="dot">·</span>
+          <span>scripts + score</span><span class="dot">·</span>
+          <span>any time</span>
+        </div>
+        <button class="btn btn-outline btn-lg" id="btn-run-agent-quick" onclick="App.run('agent_quick')" style="width:100%">Run quick content</button>
+      </div>
+    </div>
+
+    <!-- Pipeline steps -->
+    <div class="section-eyebrow" style="display:flex;justify-content:space-between;align-items:center">
+      <span>Pipeline</span>
+      <span id="step-live-label" style="font:400 11px var(--sans);color:var(--muted);letter-spacing:.4px;text-transform:none"></span>
+    </div>
+    <div class="steps-row" id="steps-full"></div>
+
+    <div class="divider"></div>
+
+    <!-- Last run recap -->
+    <div id="last-run-recap" class="run-recap" style="display:none">
+      <div class="run-recap-header">
+        <span class="run-recap-label" id="recap-label">Last run</span>
+        <span class="pill" id="recap-pill">—</span>
+      </div>
+      <div class="run-recap-nums" id="recap-nums"></div>
+    </div>
+
+  </section>
+
+  <!-- ── 2 · SORT MEDIA ── -->
+  <section id="stage-footage" class="stage">
+
+    <div class="footage-header">
+      <div>
+        <div class="stage-eyebrow">Stage 02</div>
+        <h2 class="stage-title">Sort media</h2>
+      </div>
+    </div>
+
+    <!-- Type tabs -->
+    <div class="media-tabs">
+      <button class="media-tab active" id="tab-footage" onclick="App.footage.setType('footage')">
+        Video footage <span class="tab-count" id="tab-count-footage"></span>
+      </button>
+      <button class="media-tab" id="tab-audio" onclick="App.footage.setType('audio')">
+        Audio <span class="tab-count" id="tab-count-audio"></span>
+      </button>
+      <button class="media-tab" id="tab-images" onclick="App.footage.setType('images')">
+        Images <span class="tab-count" id="tab-count-images"></span>
+      </button>
+      <div class="tab-actions">
+        <button class="btn btn-primary btn-sm" id="btn-footage-commit"
+                onclick="App.footage.commit()" disabled>Commit →</button>
+      </div>
+    </div>
+
+    <!-- Progress bar (footage + audio tabs) -->
+    <div id="footage-progress-wrap">
+      <div class="review-progress-bar">
+        <div class="prog-kept" id="prog-kept" style="width:0%"></div>
+        <div class="prog-rej"  id="prog-rej"  style="width:0%"></div>
+      </div>
+      <div class="review-progress-label" id="footage-prog-label">—</div>
+    </div>
+
+    <!-- One-at-a-time reviewer (footage + audio) -->
+    <div class="review-cols" id="footage-reviewer">
+      <div class="detail-empty" style="grid-column:1/-1">Loading…</div>
+    </div>
+
+    <!-- Image grid (images tab) -->
+    <div id="images-tab-panel" style="display:none">
+      <div class="image-grid" id="images-grid">
+        <div class="empty">Loading images…</div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ── 3 · RENDER ── -->
+  <section id="stage-render" class="stage">
+
+    <div class="stage-header">
+      <div>
+        <div class="stage-eyebrow">Stage 03</div>
+        <h2 class="stage-title">Render</h2>
+      </div>
+      <div class="stage-desc">Compose posts from approved pool material. Each editor outputs slides, story images, or reel drafts.</div>
+    </div>
+
+    <section class="pool-widget" id="pool-widget">
+      <div class="pool-widget-head">
+        <h3>Pool inventory</h3>
+        <div class="pool-widget-sub" id="pool-widget-sub">—</div>
+      </div>
+      <div id="pool-rows"></div>
+    </section>
+
+    <div class="section-eyebrow">Editor steps</div>
+    <div class="steps-row" id="steps-editor" style="display:none"></div>
+
+    <div class="render-cards">
+      <div class="render-card">
+        <div class="card-eyebrow">Format A</div>
+        <h3>Carousel</h3>
+        <p>Render multi-slide carousel posts from today's scripts. Opens image viewer for preview (best via terminal).</p>
+        <button class="btn btn-primary" id="btn-run-carousel" onclick="App.run('carousel')" style="width:100%">Run carousel editor</button>
+      </div>
+      <div class="render-card">
+        <div class="card-eyebrow">Format B</div>
+        <h3>Story</h3>
+        <p>Render 9:16 story posts — both full-background and minimal cream-canvas versions from today's quotes.</p>
+        <button class="btn btn-primary" id="btn-run-story" onclick="App.run('story')" style="width:100%">Run story editor</button>
+      </div>
+      <div class="render-card">
+        <div class="card-eyebrow">Format C</div>
+        <h3>Reel</h3>
+        <p>Assemble reel drafts from scored footage. Generates music, sound, and voice variants.</p>
+        <button class="btn btn-primary" id="btn-run-reel" onclick="App.run('reel')" style="width:100%">Run reel editor</button>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ── 4 · APPROVE TO POST ── -->
+  <section id="stage-finalreview" class="stage">
+
+    <div class="stage-header">
+      <div>
+        <div class="stage-eyebrow">Stage 04</div>
+        <h2 class="stage-title">Approve to post</h2>
+      </div>
+    </div>
+
+    <!-- Category tabs -->
+    <div class="media-tabs">
+      <button class="media-tab active" id="fr-tab-carousel" onclick="App.finalreview.setCategory('carousel')">Carousel <span class="tab-count" id="fr-count-carousel"></span></button>
+      <button class="media-tab" id="fr-tab-story" onclick="App.finalreview.setCategory('story')">Story <span class="tab-count" id="fr-count-story"></span></button>
+      <button class="media-tab" id="fr-tab-reel" onclick="App.finalreview.setCategory('reel')">Reel <span class="tab-count" id="fr-count-reel"></span></button>
+      <div class="tab-actions">
+        <button class="btn btn-ghost btn-sm" onclick="App.nav('timeline')">View timeline →</button>
+      </div>
+    </div>
+
+    <!-- Approve reviewer area -->
+    <div id="fr-reviewer"></div>
+
+  </section>
+
+  <!-- ── 5 · TIMELINE ── -->
+  <section id="stage-timeline" class="stage">
+    <div class="stage-eyebrow">Stage 05</div>
+    <h2 class="stage-title" style="font:italic 500 40px var(--serif);color:#2D4A4A;margin:0 0 28px">softer<span style="color:#C2533A">.</span> weekly rhythm</h2>
+    <!-- The 7-column week grid + side panel lives here, rendered by JS -->
+    <div id="timeline-body"></div>
+  </section>
+
+  <!-- ── 6 · INTELLIGENCE ── -->
+  <section id="stage-intelligence" class="stage">
+    <div class="stage-header">
+      <div>
+        <div class="stage-eyebrow">Stage 06</div>
+        <h2 class="stage-title">Intelligence</h2>
+      </div>
+      <div class="stage-desc">What's working, what isn't — read-only signals from the agent's review history.</div>
+    </div>
+
+    <!-- card 1 — keywords -->
+    <div class="intel-card" id="intel-card-keywords">
+      <div class="intel-card-head">
+        <h3>Keywords</h3>
+        <div class="intel-card-meta" id="intel-keywords-meta">—</div>
+      </div>
+      <div class="intel-split">
+        <div>
+          <div class="intel-col-head is-high"><span class="intel-col-mark">✓</span> Performing<span class="intel-col-count" id="intel-keywords-high-count">0</span></div>
+          <div class="intel-chips" id="intel-keywords-high"></div>
+        </div>
+        <div>
+          <div class="intel-col-head is-low"><span class="intel-col-mark">✗</span> Avoid<span class="intel-col-count" id="intel-keywords-low-count">0</span></div>
+          <div class="intel-chips" id="intel-keywords-low"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- card 2 — tags -->
+    <div class="intel-card" id="intel-card-tags">
+      <div class="intel-card-head">
+        <h3>Tags</h3>
+        <div class="intel-card-meta" id="intel-tags-meta">—</div>
+      </div>
+      <div class="intel-split">
+        <div>
+          <div class="intel-col-head is-high"><span class="intel-col-mark">✓</span> Performing<span class="intel-col-count" id="intel-tags-high-count">0</span></div>
+          <div class="intel-chips intel-chips-sm" id="intel-tags-high"></div>
+        </div>
+        <div>
+          <div class="intel-col-head is-low"><span class="intel-col-mark">✗</span> Avoid<span class="intel-col-count" id="intel-tags-low-count">0</span></div>
+          <div class="intel-chips intel-chips-sm" id="intel-tags-low"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- card 3 — universal themes -->
+    <div class="intel-card" id="intel-card-themes">
+      <div class="intel-card-head">
+        <h3>Universal Themes</h3>
+        <div class="intel-card-meta" id="intel-themes-meta">—</div>
+      </div>
+      <ol class="intel-themes" id="intel-themes-list"></ol>
+    </div>
+
+    <!-- card 4 — hooks used -->
+    <div class="intel-card" id="intel-card-hooks">
+      <div class="intel-card-head">
+        <h3>Hooks Used</h3>
+        <div class="intel-card-meta" id="intel-hooks-meta">—</div>
+      </div>
+      <ol class="intel-hooks" id="intel-hooks-list"></ol>
+    </div>
+
+    <div class="intel-foot" id="intel-foot"></div>
+  </section>
+
+</div><!-- #layout -->
+
+<!-- ═══ LOG DRAWER ═══ -->
+<div id="log-drawer">
+  <div id="log-handle" onclick="App.toggleLog()">
+    <div class="log-handle-left">
+      <span class="log-handle-name">pipeline.log</span>
+      <span class="log-handle-run" id="log-run-label">—</span>
+    </div>
+    <div class="log-handle-right">
+      <span class="log-lines-count" id="log-count">0 lines</span>
+    </div>
+  </div>
+  <div id="log-lines"></div>
+</div>
+
+<!-- ═══ CAROUSEL SLIDE LIGHTBOX ═══ -->
+<div id="carousel-lightbox" class="lightbox" style="display:none" onclick="App.finalreview.slideshowBgClick(event)">
+  <button class="lightbox-nav" id="cs-lightbox-prev" onclick="App.finalreview.slideshowNav(-1)">&#8249;</button>
+  <img class="lightbox-img" id="cs-lightbox-img" src="" alt="">
+  <button class="lightbox-nav" id="cs-lightbox-next" onclick="App.finalreview.slideshowNav(1)">&#8250;</button>
+  <button class="lightbox-close" onclick="App.finalreview.closeSlideshow()">&#x2715;</button>
+  <span class="lightbox-counter" id="cs-lightbox-counter"></span>
+</div>
+
+<!-- ═══ IMAGE LIGHTBOX ═══ -->
+<div id="img-lightbox" class="lightbox" style="display:none" onclick="App.images.lightboxBgClick(event)">
+  <button class="lightbox-nav" id="lightbox-prev" onclick="App.images.lightboxNav(-1)">&#8249;</button>
+  <img class="lightbox-img" id="lightbox-img" src="" alt="">
+  <button class="lightbox-nav" id="lightbox-next" onclick="App.images.lightboxNav(1)">&#8250;</button>
+  <button class="lightbox-close" onclick="App.images.closeLightbox()">&#x2715;</button>
+  <span class="lightbox-counter" id="lightbox-counter"></span>
+  <div class="lightbox-rate-bar">
+    <button class="lightbox-rate-btn keep" id="lightbox-rate-g"
+            onclick="event.stopPropagation();App.images.rateInLightbox('g')">✓ Keep</button>
+    <button class="lightbox-rate-btn reject" id="lightbox-rate-b"
+            onclick="event.stopPropagation();App.images.rateInLightbox('b')">✗ Reject</button>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

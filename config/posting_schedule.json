@@ -1,0 +1,55 @@
+{
+  "timezone": "Europe/Berlin",
+  "slots": [
+    {
+      "id": "sun_reel",
+      "day": "sunday",
+      "time_start": "19:00",
+      "time_end": "21:00",
+      "format": "reel",
+      "label": "wind-down",
+      "optional": false,
+      "active": true
+    },
+    {
+      "id": "tue_carousel",
+      "day": "tuesday",
+      "time_start": "07:00",
+      "time_end": "08:00",
+      "format": "carousel",
+      "label": "save peak",
+      "optional": false,
+      "active": true
+    },
+    {
+      "id": "wed_quote",
+      "day": "wednesday",
+      "time_start": "20:00",
+      "time_end": "21:00",
+      "format": "quote_post",
+      "label": "midweek soft moment",
+      "optional": true,
+      "active": true
+    },
+    {
+      "id": "thu_reel",
+      "day": "thursday",
+      "time_start": "19:00",
+      "time_end": "21:00",
+      "format": "reel",
+      "label": "midweek reach",
+      "optional": false,
+      "active": true
+    },
+    {
+      "id": "sat_carousel",
+      "day": "saturday",
+      "time_start": "09:00",
+      "time_end": "10:00",
+      "format": "carousel",
+      "label": "slow weekend",
+      "optional": false,
+      "active": true
+    }
+  ]
+}

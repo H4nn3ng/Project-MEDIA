@@ -1,0 +1,57 @@
+# Secrets & credentials
+.env
+.env.example
+.env.local
+.env.*.local
+*servicekey*.json
+*service_gen_lang*.json
+*credentials.json
+healingagent-servicekey.json
+service_gen_lang_client.json
+
+# Data & media
+data/
+*.mp4
+*.mp3
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.wav
+*.onnx
+*.bin
+
+# Runtime state
+archive/
+weekly_batch/
+runs/
+
+# Virtual environments
+venv/
+.venv/
+agent1/
+
+# Documentation & workflow notes
+workflow_md/
+md/
+*.md
+*.txt
+
+# IDE & tool configs
+.vscode/
+.claude/
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Logs & cache
+*.log
+.*_cache.json
+.pixabay_image_cache.json
+.freesound_daily.json
+
+# World & corpus files
+world_bible.json

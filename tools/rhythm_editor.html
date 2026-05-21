@@ -1,0 +1,787 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>softer. — rhythm editor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --reel:       #1F3A5F;
+    --reel-tint:  #D7E1EC;
+    --reel-text:  #14274A;
+
+    --carousel:      #5C7A3E;
+    --carousel-tint: #DEE7CC;
+    --carousel-text: #324A1F;
+
+    --quote:      #C2533A;
+    --quote-tint: #F5D9CF;
+    --quote-text: #7A2F1C;
+
+    --cream:    #F4EDE0;
+    --cream-2:  #FBF7EE;
+    --teal:     #2D4A4A;
+    --ink:      #1A1A1A;
+    --ink-soft: #4A4644;
+    --muted:    #8B847C;
+    --line:     #E5DCC8;
+    --line-soft:#EDE5D2;
+
+    --serif: 'Cormorant Garamond', Georgia, serif;
+    --sans:  Inter, -apple-system, system-ui, sans-serif;
+    --mono:  'JetBrains Mono', ui-monospace, monospace;
+
+    --radius:    10px;
+    --radius-sm: 8px;
+    --shadow-soft: 0 1px 2px rgba(45,74,74,0.04), 0 8px 24px -16px rgba(45,74,74,0.18);
+    --shadow-lift: 0 2px 4px rgba(45,74,74,0.06), 0 18px 40px -22px rgba(45,74,74,0.28);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--sans);
+    color: var(--ink);
+    background: var(--cream);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  .page {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 40px 60px 60px;
+    display: flex; flex-direction: column;
+    gap: 28px;
+  }
+
+  /* header */
+  header { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; flex-wrap: wrap; }
+  .brand h1 {
+    font-family: var(--serif);
+    font-weight: 500;
+    font-style: italic;
+    font-size: 52px;
+    line-height: 1;
+    color: var(--teal);
+    margin: 0;
+    letter-spacing: -0.5px;
+  }
+  .brand h1 .dot { color: var(--quote); font-style: normal; }
+  .brand h1 .ed { color: var(--ink-soft); font-style: normal; font-weight: 400; font-size: 28px; margin-left: 14px; letter-spacing: 1px; }
+  .brand .caption {
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--muted);
+    letter-spacing: 0.6px;
+    margin-top: 12px;
+  }
+  .brand .caption::before {
+    content: "";
+    display: inline-block;
+    width: 20px; height: 1px;
+    background: var(--muted);
+    vertical-align: middle;
+    margin-right: 10px;
+    opacity: 0.6;
+  }
+
+  .toolbar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .btn {
+    padding: 9px 16px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font: 500 13px var(--sans);
+    letter-spacing: 0.3px;
+    background: var(--cream-2);
+    color: var(--ink-soft);
+    transition: background .12s, color .12s, border-color .12s;
+  }
+  .btn:hover { background: #fff; }
+  .btn.primary { background: var(--teal); color: var(--cream); border-color: var(--teal); }
+  .btn.primary:hover { opacity: .9; }
+  .btn.warn { background: var(--quote-tint); color: var(--quote-text); border-color: var(--quote); }
+  .btn.ghost { background: transparent; border-color: var(--line); }
+  .btn.sm { padding: 6px 12px; font-size: 12px; }
+
+  /* validation banner */
+  .banner {
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    font: 400 13px var(--sans);
+    background: var(--carousel-tint);
+    color: var(--carousel-text);
+    border-left: 3px solid var(--carousel);
+  }
+  .banner.warn { background: var(--quote-tint); color: var(--quote-text); border-left-color: var(--quote); }
+  .banner.err  { background: #f8d4d4; color: #6c2020; border-left-color: #b04848; }
+  .banner ul { margin: 4px 0 0 18px; padding: 0; }
+
+  /* week grid */
+  .week {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 14px;
+    align-content: start;
+  }
+  @media (max-width: 980px) { .week { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 540px) { .week { grid-template-columns: 1fr; } }
+
+  .day { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .day-head {
+    padding: 4px 6px 12px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 4px;
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .day-name { font: italic 22px var(--serif); color: var(--teal); line-height: 1; }
+  .day-add {
+    border: 1px dashed var(--line);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font: 400 11px var(--sans);
+    border-radius: 999px;
+    padding: 2px 9px;
+    letter-spacing: 0.3px;
+  }
+  .day-add:hover { color: var(--teal); border-color: var(--teal); }
+
+  .day-empty {
+    font: 400 28px var(--serif);
+    color: var(--line);
+    text-align: center;
+    padding: 28px 0;
+    line-height: 1;
+  }
+
+  /* slot card */
+  .slot {
+    position: relative;
+    background: var(--cream-2);
+    border-radius: var(--radius);
+    padding: 16px 16px 14px;
+    box-shadow: var(--shadow-soft);
+    transition: transform 200ms ease, box-shadow 200ms ease, opacity 200ms ease;
+    border-left: 4px solid transparent;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .slot::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(180deg, rgba(255,255,255,0.5), transparent 40%);
+    opacity: 0.6;
+  }
+  .slot:hover { transform: translateY(-3px); box-shadow: var(--shadow-lift); }
+
+  .slot[data-fmt="reel"]       { background: var(--reel-tint);     border-left-color: var(--reel); }
+  .slot[data-fmt="carousel"]   { background: var(--carousel-tint); border-left-color: var(--carousel); }
+  .slot[data-fmt="quote_post"] { background: var(--quote-tint);    border-left-color: var(--quote); }
+
+  .slot-fmt-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .slot-dot { width: 8px; height: 8px; border-radius: 999px; flex-shrink: 0; }
+  .slot[data-fmt="reel"]       .slot-dot { background: var(--reel); }
+  .slot[data-fmt="carousel"]   .slot-dot { background: var(--carousel); }
+  .slot[data-fmt="quote_post"] .slot-dot { background: var(--quote); }
+
+  .slot-fmt {
+    font: 700 10px var(--sans);
+    letter-spacing: 2.4px;
+    text-transform: uppercase;
+  }
+  .slot[data-fmt="reel"]       .slot-fmt { color: var(--reel-text); }
+  .slot[data-fmt="carousel"]   .slot-fmt { color: var(--carousel-text); }
+  .slot[data-fmt="quote_post"] .slot-fmt { color: var(--quote-text); }
+
+  .slot-time {
+    font: italic 500 28px var(--serif);
+    line-height: 1.05; letter-spacing: -0.3px;
+    color: var(--teal);
+  }
+  .slot[data-fmt="reel"]       .slot-time { color: var(--reel-text); }
+  .slot[data-fmt="carousel"]   .slot-time { color: var(--carousel-text); }
+  .slot[data-fmt="quote_post"] .slot-time { color: var(--quote-text); }
+  .slot-time .ampm {
+    font: 500 11px var(--sans); color: var(--muted);
+    letter-spacing: 1px; margin-left: 4px;
+    text-transform: uppercase; vertical-align: 4px;
+  }
+  .slot-window {
+    font: 400 11px var(--sans); color: var(--muted);
+    margin-top: 6px; letter-spacing: 0.3px;
+  }
+  .slot-label {
+    font: italic 14px var(--serif); color: var(--ink-soft);
+    margin-top: 12px; padding-top: 10px;
+    border-top: 1px dashed var(--line-soft); line-height: 1.3;
+  }
+  .slot.optional { opacity: 0.8; }
+  .slot.optional-off {
+    opacity: 0.45; background: transparent;
+    box-shadow: none; border-left-style: dashed;
+    border-left-color: var(--line);
+  }
+  .slot.optional-off::before { display: none; }
+  .slot.optional-off .slot-time,
+  .slot.optional-off .slot-label {
+    text-decoration: line-through;
+    text-decoration-color: rgba(26,26,26,0.35);
+  }
+
+  /* tiny toggle */
+  .toggle {
+    position: absolute; top: 12px; right: 12px;
+    width: 30px; height: 16px;
+    border-radius: 999px;
+    background: rgba(139,132,124,0.25);
+    cursor: pointer; transition: background 200ms ease;
+    z-index: 1; border: none; padding: 0;
+  }
+  .toggle::after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 12px; height: 12px; border-radius: 999px;
+    background: var(--cream-2);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+    transition: transform 200ms ease;
+  }
+  .toggle.on { background: var(--carousel); }
+  .toggle.on::after { transform: translateX(14px); }
+
+  /* modal */
+  .modal-bg {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(45,74,74,0.45);
+    display: none; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .modal-bg.open { display: flex; }
+  .modal {
+    background: var(--cream); border-radius: var(--radius);
+    max-width: 460px; width: 100%;
+    padding: 28px 28px 22px;
+    box-shadow: var(--shadow-lift);
+  }
+  .modal h2 {
+    font: italic 500 26px var(--serif);
+    color: var(--teal); margin: 0 0 18px;
+  }
+  .modal-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .modal-row label {
+    font: 500 10px var(--sans);
+    letter-spacing: 1.6px; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .modal-row input, .modal-row select {
+    padding: 8px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--line);
+    background: var(--cream-2);
+    font: 400 13px var(--sans);
+    color: var(--ink);
+  }
+  .modal-row input:focus, .modal-row select:focus {
+    outline: 2px solid var(--carousel);
+    outline-offset: 1px;
+  }
+  .modal-row.inline { flex-direction: row; align-items: center; gap: 10px; }
+  .modal-actions {
+    display: flex; justify-content: space-between; gap: 8px;
+    margin-top: 8px;
+  }
+  .modal-actions .left  { display: flex; gap: 8px; }
+  .modal-actions .right { display: flex; gap: 8px; }
+
+  /* context menu */
+  .ctx-menu {
+    position: fixed; z-index: 1500;
+    background: var(--cream-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    box-shadow: var(--shadow-lift);
+    padding: 6px 0;
+    display: none;
+    min-width: 160px;
+  }
+  .ctx-menu.open { display: block; }
+  .ctx-menu button {
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    padding: 8px 16px;
+    font: 400 13px var(--sans);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .ctx-menu button:hover { background: var(--cream); }
+  .ctx-menu .danger { color: var(--quote-text); }
+
+  /* footer */
+  .footer-meta {
+    margin-top: 10px;
+    font: 400 11px var(--mono);
+    color: var(--muted);
+    letter-spacing: 0.5px;
+  }
+  .raw {
+    padding: 12px 14px;
+    border: 1px dashed var(--line);
+    border-radius: 6px;
+    font: 400 11px var(--mono);
+    color: var(--ink-soft);
+    background: var(--cream-2);
+    white-space: pre-wrap;
+    max-height: 180px;
+    overflow-y: auto;
+    display: none;
+  }
+  .raw.open { display: block; }
+
+  /* helper kbd */
+  kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    background: var(--cream-2);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    font: 400 11px var(--mono);
+    color: var(--ink-soft);
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- header -->
+  <header>
+    <div class="brand">
+      <h1><em>softer</em><span class="dot">.</span><span class="ed">rhythm editor</span></h1>
+      <div class="caption">edit the weekly posting schedule · saves to <code>config/posting_schedule.json</code></div>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn ghost" onclick="App.addSlotPrompt()">+ Add slot</button>
+      <button class="btn ghost sm" onclick="App.toggleRaw()">Raw JSON</button>
+      <button class="btn warn" onclick="App.resetDefaults()">Reset to defaults</button>
+      <button class="btn primary" onclick="App.saveDownload()">Download JSON</button>
+      <button class="btn" onclick="App.copyClipboard()">Copy to clipboard</button>
+    </div>
+  </header>
+
+  <div id="banner-area"></div>
+
+  <div class="week" id="week-grid"></div>
+
+  <pre class="raw" id="raw-view"></pre>
+
+  <div class="footer-meta">
+    Right-click a slot to delete it · click a slot to edit · toggle switch only appears on optional slots.<br>
+    File: <kbd>config/posting_schedule.json</kbd> (relative to <kbd>healing-agent/</kbd>)
+  </div>
+
+</div>
+
+<!-- Edit / New modal -->
+<div class="modal-bg" id="modal-bg" onclick="App._modalBgClick(event)">
+  <div class="modal" id="modal">
+    <h2 id="modal-title">Edit slot</h2>
+
+    <div class="modal-row">
+      <label>Day</label>
+      <select id="f-day">
+        <option value="sunday">Sunday</option>
+        <option value="monday">Monday</option>
+        <option value="tuesday">Tuesday</option>
+        <option value="wednesday">Wednesday</option>
+        <option value="thursday">Thursday</option>
+        <option value="friday">Friday</option>
+        <option value="saturday">Saturday</option>
+      </select>
+    </div>
+
+    <div class="modal-row">
+      <label>Format</label>
+      <select id="f-format">
+        <option value="reel">Reel</option>
+        <option value="carousel">Carousel</option>
+        <option value="quote_post">Quote post</option>
+      </select>
+    </div>
+
+    <div class="modal-row" style="flex-direction:row;gap:10px">
+      <div style="flex:1">
+        <label>Time start</label>
+        <input type="time" id="f-time-start" />
+      </div>
+      <div style="flex:1">
+        <label>Time end</label>
+        <input type="time" id="f-time-end" />
+      </div>
+    </div>
+
+    <div class="modal-row">
+      <label>Label</label>
+      <input type="text" id="f-label" placeholder="e.g. wind-down" maxlength="64" />
+    </div>
+
+    <div class="modal-row inline">
+      <input type="checkbox" id="f-optional" />
+      <label for="f-optional" style="text-transform:none;letter-spacing:0.3px;font-size:13px;color:var(--ink-soft)">Optional (can be toggled off in the timeline view)</label>
+    </div>
+
+    <div class="modal-row inline" id="f-active-row">
+      <input type="checkbox" id="f-active" checked />
+      <label for="f-active" style="text-transform:none;letter-spacing:0.3px;font-size:13px;color:var(--ink-soft)">Active right now</label>
+    </div>
+
+    <div class="modal-actions">
+      <div class="left">
+        <button class="btn warn sm" id="f-delete" onclick="App.deleteFromModal()" style="display:none">Delete slot</button>
+      </div>
+      <div class="right">
+        <button class="btn ghost" onclick="App.closeModal()">Cancel</button>
+        <button class="btn primary" onclick="App.saveModal()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Context menu -->
+<div class="ctx-menu" id="ctx-menu">
+  <button onclick="App.editFromCtx()">Edit slot…</button>
+  <button class="danger" onclick="App.deleteFromCtx()">Delete slot</button>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────
+const DEFAULT_SLOTS = [
+  { id:"sun_reel",     day:"sunday",    time_start:"19:00", time_end:"21:00", format:"reel",       label:"wind-down",           optional:false, active:true },
+  { id:"tue_carousel", day:"tuesday",   time_start:"07:00", time_end:"08:00", format:"carousel",   label:"save peak",           optional:false, active:true },
+  { id:"wed_quote",    day:"wednesday", time_start:"20:00", time_end:"21:00", format:"quote_post", label:"midweek soft moment", optional:true,  active:true },
+  { id:"thu_reel",     day:"thursday",  time_start:"19:00", time_end:"21:00", format:"reel",       label:"midweek reach",       optional:false, active:true },
+  { id:"sat_carousel", day:"saturday",  time_start:"09:00", time_end:"10:00", format:"carousel",   label:"slow weekend",        optional:false, active:true },
+];
+
+const DAYS = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+
+const App = {
+  schedule: null,
+  editingId: null,
+  ctxId:     null,
+
+  async init() {
+    try {
+      const res = await fetch('../config/posting_schedule.json', { cache: 'no-store' });
+      if (!res.ok) throw new Error('not found');
+      this.schedule = await res.json();
+    } catch(e) {
+      this.schedule = { timezone: 'Europe/Berlin', slots: DEFAULT_SLOTS.slice() };
+    }
+    this._normalize();
+    this.render();
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.ctx-menu') && !e.target.closest('.slot')) {
+        this._closeCtx();
+      }
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { this.closeModal(); this._closeCtx(); }
+    });
+  },
+
+  _normalize() {
+    this.schedule.slots = (this.schedule.slots || []).map(s => ({
+      id:         s.id || ('slot_' + Math.random().toString(36).slice(2,9)),
+      day:        s.day || 'monday',
+      time_start: s.time_start || '09:00',
+      time_end:   s.time_end   || s.time_start || '10:00',
+      format:     s.format || 'reel',
+      label:      s.label || '',
+      optional:   !!s.optional,
+      active:     s.active !== false,
+    }));
+    if (!this.schedule.timezone) this.schedule.timezone = 'Europe/Berlin';
+  },
+
+  render() {
+    const grid = document.getElementById('week-grid');
+    grid.innerHTML = DAYS.map(day => {
+      const slots = this.schedule.slots.filter(s => s.day === day);
+      const slotsHtml = slots.length
+        ? slots.map(s => this._slotHtml(s)).join('')
+        : '<div class="day-empty">—</div>';
+      return `
+        <div class="day" data-day="${day}">
+          <div class="day-head">
+            <div class="day-name">${day}</div>
+            <button class="day-add" title="Add slot here" onclick="App.addSlotPrompt('${day}')">+</button>
+          </div>
+          ${slotsHtml}
+        </div>`;
+    }).join('');
+    this._renderRaw();
+    this._renderBanner();
+  },
+
+  _slotHtml(s) {
+    const cls = ['slot'];
+    if (s.optional) cls.push('optional');
+    if (s.optional && !s.active) cls.push('optional-off');
+
+    const [hStart] = s.time_start.split(':').map(n => parseInt(n,10));
+    const [hEnd]   = s.time_end.split(':').map(n => parseInt(n,10));
+    const ampm     = hStart < 12 ? 'am' : 'pm';
+    const endAmpm  = hEnd   < 12 ? 'am' : 'pm';
+    const h12      = ((hStart + 11) % 12) + 1;
+    const hEnd12   = ((hEnd   + 11) % 12) + 1;
+    const range    = (ampm === endAmpm) ? `–${hEnd12} ${ampm}` : `–${hEnd12} ${endAmpm}`;
+
+    const fmtLabel = s.format === 'quote_post' ? 'quote post' : s.format;
+
+    let windowText = '';
+    if (hStart < 11)      windowText = s.optional ? 'morning · optional' : 'morning';
+    else if (hStart < 14) windowText = 'midday';
+    else if (hStart < 18) windowText = 'afternoon';
+    else                  windowText = s.optional ? 'evening · optional' : 'evening';
+
+    const toggle = s.optional
+      ? `<button class="toggle ${s.active ? 'on' : 'off'}" title="optional toggle"
+                 onclick="event.stopPropagation();App.toggleActive('${esc(s.id)}')"></button>`
+      : '';
+
+    return `
+      <div class="${cls.join(' ')}" data-fmt="${esc(s.format)}" data-id="${esc(s.id)}"
+           onclick="App.openEdit('${esc(s.id)}')"
+           oncontextmenu="App.openCtx(event,'${esc(s.id)}')">
+        ${toggle}
+        <div class="slot-fmt-row">
+          <span class="slot-dot"></span>
+          <span class="slot-fmt">${esc(fmtLabel)}</span>
+        </div>
+        <div class="slot-time">${h12}<span class="ampm">${range}</span></div>
+        <div class="slot-window">${windowText}</div>
+        <div class="slot-label">${esc(s.label || '—')}</div>
+      </div>`;
+  },
+
+  _renderRaw() {
+    const el = document.getElementById('raw-view');
+    el.textContent = JSON.stringify(this.schedule, null, 2);
+  },
+
+  toggleRaw() {
+    document.getElementById('raw-view').classList.toggle('open');
+  },
+
+  // ── Validation ───────────────────────────────────────
+  _renderBanner() {
+    const area  = document.getElementById('banner-area');
+    const slots = this.schedule.slots;
+    const issues = [];
+    const warns  = [];
+
+    // duplicates (day, time_start)
+    const seen = new Map();
+    slots.forEach(s => {
+      const k = s.day + '|' + s.time_start;
+      if (seen.has(k)) issues.push(`Duplicate slot — two posts at ${s.time_start} on ${s.day}.`);
+      seen.set(k, true);
+    });
+
+    // >5 active
+    const active = slots.filter(s => s.active !== false).length;
+    if (active > 5) warns.push(`${active} active slots — soft cap is 5/week. Consider marking some as optional.`);
+
+    // 3-day gap between active slots
+    const activeDayIdx = slots
+      .filter(s => s.active !== false)
+      .map(s => DAYS.indexOf(s.day))
+      .sort((a,b) => a - b);
+    if (activeDayIdx.length >= 2) {
+      const gaps = [];
+      for (let i = 1; i < activeDayIdx.length; i++) gaps.push(activeDayIdx[i] - activeDayIdx[i-1]);
+      // wrap gap
+      gaps.push(7 - activeDayIdx[activeDayIdx.length-1] + activeDayIdx[0]);
+      const maxGap = Math.max(...gaps);
+      if (maxGap > 3) warns.push(`Longest quiet stretch is ${maxGap} days — feed may feel dormant.`);
+    }
+
+    let html = '';
+    if (issues.length) html += `<div class="banner err"><b>Cannot save:</b><ul>${issues.map(i => '<li>'+esc(i)+'</li>').join('')}</ul></div>`;
+    if (warns.length)  html += `<div class="banner warn"><b>Heads-up:</b><ul>${warns.map(w => '<li>'+esc(w)+'</li>').join('')}</ul></div>`;
+    area.innerHTML = html;
+  },
+
+  _hasFatal() {
+    // duplicates only — soft warnings don't block save
+    const seen = new Map();
+    for (const s of this.schedule.slots) {
+      const k = s.day + '|' + s.time_start;
+      if (seen.has(k)) return true;
+      seen.set(k, true);
+    }
+    return false;
+  },
+
+  // ── Modal ────────────────────────────────────────────
+  openEdit(id) {
+    const slot = this.schedule.slots.find(s => s.id === id);
+    if (!slot) return;
+    this.editingId = id;
+    document.getElementById('modal-title').textContent = 'Edit slot';
+    document.getElementById('f-day').value          = slot.day;
+    document.getElementById('f-format').value       = slot.format;
+    document.getElementById('f-time-start').value   = slot.time_start;
+    document.getElementById('f-time-end').value     = slot.time_end;
+    document.getElementById('f-label').value        = slot.label || '';
+    document.getElementById('f-optional').checked   = !!slot.optional;
+    document.getElementById('f-active').checked     = slot.active !== false;
+    document.getElementById('f-delete').style.display = '';
+    document.getElementById('modal-bg').classList.add('open');
+  },
+
+  addSlotPrompt(day) {
+    this.editingId = null;
+    document.getElementById('modal-title').textContent = 'New slot';
+    document.getElementById('f-day').value          = day || 'sunday';
+    document.getElementById('f-format').value       = 'reel';
+    document.getElementById('f-time-start').value   = '19:00';
+    document.getElementById('f-time-end').value     = '21:00';
+    document.getElementById('f-label').value        = '';
+    document.getElementById('f-optional').checked   = false;
+    document.getElementById('f-active').checked     = true;
+    document.getElementById('f-delete').style.display = 'none';
+    document.getElementById('modal-bg').classList.add('open');
+  },
+
+  closeModal() {
+    document.getElementById('modal-bg').classList.remove('open');
+    this.editingId = null;
+  },
+
+  _modalBgClick(e) {
+    if (e.target === e.currentTarget) this.closeModal();
+  },
+
+  saveModal() {
+    const day        = document.getElementById('f-day').value;
+    const format     = document.getElementById('f-format').value;
+    const time_start = document.getElementById('f-time-start').value;
+    const time_end   = document.getElementById('f-time-end').value;
+    const label      = document.getElementById('f-label').value.trim();
+    const optional   = document.getElementById('f-optional').checked;
+    const active     = document.getElementById('f-active').checked;
+
+    if (!time_start || !time_end) { alert('Time fields required.'); return; }
+    if (time_end <= time_start)    { alert('Time end must be after time start.'); return; }
+
+    // duplicate check excluding self
+    const dup = this.schedule.slots.some(s =>
+      s.id !== this.editingId && s.day === day && s.time_start === time_start);
+    if (dup) { alert('Another slot already exists at ' + day + ' ' + time_start + '.'); return; }
+
+    if (this.editingId) {
+      const slot = this.schedule.slots.find(s => s.id === this.editingId);
+      Object.assign(slot, { day, format, time_start, time_end, label, optional, active });
+    } else {
+      const id = format.split('_')[0] + '_' + day.slice(0,3) + '_' + time_start.replace(':','');
+      this.schedule.slots.push({ id, day, format, time_start, time_end, label, optional, active });
+    }
+    this.closeModal();
+    this.render();
+  },
+
+  deleteFromModal() {
+    if (!this.editingId) return;
+    if (!confirm('Delete this slot?')) return;
+    this.schedule.slots = this.schedule.slots.filter(s => s.id !== this.editingId);
+    this.closeModal();
+    this.render();
+  },
+
+  toggleActive(id) {
+    const slot = this.schedule.slots.find(s => s.id === id);
+    if (!slot) return;
+    slot.active = !slot.active;
+    this.render();
+  },
+
+  // ── Context menu ─────────────────────────────────────
+  openCtx(e, id) {
+    e.preventDefault();
+    this.ctxId = id;
+    const menu = document.getElementById('ctx-menu');
+    menu.style.left = e.clientX + 'px';
+    menu.style.top  = e.clientY + 'px';
+    menu.classList.add('open');
+  },
+
+  _closeCtx() {
+    document.getElementById('ctx-menu').classList.remove('open');
+    this.ctxId = null;
+  },
+
+  editFromCtx() {
+    const id = this.ctxId;
+    this._closeCtx();
+    if (id) this.openEdit(id);
+  },
+
+  deleteFromCtx() {
+    const id = this.ctxId;
+    this._closeCtx();
+    if (!id) return;
+    if (!confirm('Delete this slot?')) return;
+    this.schedule.slots = this.schedule.slots.filter(s => s.id !== id);
+    this.render();
+  },
+
+  // ── Save / Export ────────────────────────────────────
+  resetDefaults() {
+    if (!confirm('Reset to the 5 default slots? Current schedule will be lost.')) return;
+    this.schedule = { timezone: 'Europe/Berlin', slots: DEFAULT_SLOTS.map(s => ({...s})) };
+    this.render();
+  },
+
+  saveDownload() {
+    if (this._hasFatal()) { alert('Cannot save — fix duplicate (day, time) conflicts first.'); return; }
+    const blob = new Blob([JSON.stringify(this.schedule, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = 'posting_schedule.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
+  async copyClipboard() {
+    if (this._hasFatal()) { alert('Fix duplicate (day, time) conflicts first.'); return; }
+    const txt = JSON.stringify(this.schedule, null, 2);
+    try {
+      await navigator.clipboard.writeText(txt);
+      alert('Copied to clipboard — paste into config/posting_schedule.json');
+    } catch(e) {
+      alert('Clipboard blocked — use Download instead.');
+    }
+  },
+};
+
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+document.addEventListener('DOMContentLoaded', () => App.init());
+</script>
+</body>
+</html>
