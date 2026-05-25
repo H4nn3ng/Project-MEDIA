@@ -290,6 +290,12 @@ const App = {
       return;
     }
 
+    // Schedule slot modal
+    if (document.getElementById('sched-modal')?.classList.contains('open')) {
+      if (e.key === 'Escape') { this.timeline.closeSlotModal(); return; }
+      return;
+    }
+
     // Pool inventory lightbox (render stage)
     if (this.poolWidget.isLbOpen()) {
       if (e.key === 'ArrowRight') { this.poolWidget.navLb(1);   return; }
@@ -756,9 +762,10 @@ const App = {
   finalreview: {
     renders:        [],
     activeCategory: 'carousel',
-    filterMode:     'all',        // 'all' | 'pending' | 'approved' | 'rejected'
+    filterMode:     'pending',     // 'pending' | 'all' | 'approved' | 'rejected'
     chosenVariants: {},
     _slidesMap:     {},
+    _detailsCache:  {},           // post_key -> {render_name, title, thumbnail_url, caption}
     slideshowKey:   null,
     slideshowIdx:   -1,
 
@@ -868,6 +875,14 @@ const App = {
       return '<div class="fr-carousel-grid">' + visible.map(c => {
         const key    = _esc(c.key || c.dir);
         this._slidesMap[c.key || c.dir] = c.slides.map(s => s.media_url);
+        // Cache data needed for schedule assignment
+        this._detailsCache[c.key || c.dir] = {
+          render_name:   d.name,
+          title:         c.theme || c.dir,
+          thumbnail_url: c.slides[0]?.media_url || '',
+          caption:       c.caption  || '',
+          format:        'carousel',
+        };
         const vcls   = c.verdict || '';
         const slides = c.slides.map((s, i) =>
           `<img src="/media/${s.media_url}" alt="slide ${i+1}" loading="lazy"
@@ -894,6 +909,14 @@ const App = {
       if (!visible.length) return '';
       return '<div class="fr-story-list">' + visible.map(img => {
         const vcls = img.verdict || '';
+        // Cache data for schedule assignment
+        this._detailsCache[img.key] = {
+          render_name:   d.name,
+          title:         img.quote ? img.quote.slice(0, 60) : img.filename,
+          thumbnail_url: img.media_url,
+          caption:       img.caption || '',
+          format:        'quote_post',
+        };
         return `
           <div class="fr-story-card ${vcls}">
             <img src="/media/${img.media_url}" alt="${_esc(img.filename)}" loading="lazy">
@@ -911,6 +934,16 @@ const App = {
       if (!d.variants?.length || !this._itemMatches(d.verdict)) return '';
       const chosen = this.chosenVariants[d.name] || d.chosen || d.variants[0]?.filename || '';
       const v = d.variants.find(x => x.filename === chosen);
+      // Cache data for schedule assignment
+      this._detailsCache[d.name] = {
+        render_name:    d.name,
+        title:          d.name,
+        thumbnail_url:  '',
+        video_url:      v?.media_url || '',
+        chosen_variant: chosen,
+        caption:        d.caption || '',
+        format:         'reel',
+      };
 
       const tabs = d.variants.map(vr => {
         const label = vr.filename.replace('draft_', '').replace('.mp4', '');
@@ -1038,6 +1071,28 @@ const App = {
       });
       const data = await res.json();
       if (data.error) { alert('Error: ' + data.error); return; }
+
+      // Auto-assign to timeline when approved; remove when rejected
+      if (verdict === 'postable') {
+        const cached = this._detailsCache[key] || {};
+        fetch('/api/schedule-assignments', {
+          method:  'POST',
+          headers: {'Content-Type':'application/json'},
+          body:    JSON.stringify({
+            post_key:       key,
+            render_name:    cached.render_name || renderName,
+            title:          cached.title || key,
+            thumbnail_url:  cached.thumbnail_url || '',
+            video_url:      cached.video_url || '',
+            chosen_variant: chosenVariant || cached.chosen_variant || '',
+            caption:        cached.caption || '',
+          }),
+        }).catch(() => {});  // non-fatal — timeline still works without it
+      } else if (verdict === 'not_postable') {
+        fetch('/api/schedule-assignments/' + encodeURIComponent(key), { method: 'DELETE' })
+          .catch(() => {});
+      }
+
       await this._refresh();
     },
 
@@ -1050,6 +1105,9 @@ const App = {
       });
       const data = await res.json();
       if (data.error) { alert('Error: ' + data.error); return; }
+      // Remove from schedule when verdict is cleared
+      fetch('/api/schedule-assignments/' + encodeURIComponent(key), { method: 'DELETE' })
+        .catch(() => {});
       await this._refresh();
     },
 
@@ -1070,12 +1128,46 @@ const App = {
   },
 
   // ─────────────────────────────────────────────────────
-  // Timeline — weekly rhythm view (Stage 05)
+  // Timeline — monthly calendar view (Stage 05)
   // ─────────────────────────────────────────────────────
   timeline: {
-    schedule:  null,
-    stats:     null,
-    overrides: {},  // slot_id -> active(bool) — session-only optional toggles
+    schedule:   null,
+    stats:      null,
+    assignments:[],
+    weeksAhead: {},
+    overrides:  {},       // slot_id -> active(bool) — session-only
+    viewMonth:  new Date().getMonth(),
+    viewYear:   new Date().getFullYear(),
+
+    // Carousel slideshow state for the timeline modal — independent from
+    // the Approve section's slideshow (App.finalreview._slidesMap).
+    _slideUrls: [],
+    _slideIdx:  0,
+
+    _openCarouselSlideshow(urls, startIdx) {
+      this._slideUrls = urls;
+      this._slideIdx  = startIdx || 0;
+      this._updateCarouselSlideshow();
+    },
+
+    _updateCarouselSlideshow() {
+      const img     = document.getElementById('sched-slide-img');
+      const counter = document.getElementById('sched-slide-counter');
+      const prev    = document.getElementById('sched-slide-prev');
+      const next    = document.getElementById('sched-slide-next');
+      if (!img) return;
+      img.src = '/media/' + this._slideUrls[this._slideIdx];
+      if (counter) counter.textContent = (this._slideIdx + 1) + ' / ' + this._slideUrls.length;
+      if (prev)    prev.disabled  = this._slideIdx === 0;
+      if (next)    next.disabled  = this._slideIdx >= this._slideUrls.length - 1;
+    },
+
+    slideshowNav(delta) {
+      const n = this._slideIdx + delta;
+      if (n < 0 || n >= this._slideUrls.length) return;
+      this._slideIdx = n;
+      this._updateCarouselSlideshow();
+    },
 
     async load() {
       try {
@@ -1085,10 +1177,23 @@ const App = {
       } catch(e) {
         this.schedule = this._defaultSchedule();
       }
+      // Retroactively assign posts approved before auto-assign was deployed
+      try { await fetch('/api/schedule-auto-assign', { method: 'POST' }); } catch(e) {}
+      // Backfill caption.txt for older approved carousels that were copied
+      // before the verdict path wrote captions to the approved folder.
+      try { await fetch('/api/backfill-captions', { method: 'POST' }); } catch(e) {}
       try {
         const sres = await fetch('/api/stats');
         this.stats = await sres.json();
       } catch(e) { this.stats = null; }
+      try {
+        const ares = await fetch('/api/schedule-assignments');
+        this.assignments = await ares.json();
+      } catch(e) { this.assignments = []; }
+      try {
+        const wres = await fetch('/api/schedule-weeks-ahead');
+        this.weeksAhead = await wres.json();
+      } catch(e) { this.weeksAhead = {}; }
       this._render();
     },
 
@@ -1110,105 +1215,136 @@ const App = {
       return slot.active !== false;
     },
 
-    _toggle(slotId) {
-      const slot = (this.schedule.slots || []).find(s => s.id === slotId);
-      if (!slot) return;
-      this.overrides[slotId] = !this._isActive(slot);
-      this._render();
+    _mondayOf(dt) {
+      const d   = new Date(dt);
+      const day = d.getDay();
+      d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+      d.setHours(0, 0, 0, 0);
+      return d;
+    },
+
+    _isoDate(dt) {
+      // Use LOCAL date components, not UTC. The Python side stores
+      // week_start as a local-date ISO string (date.today() -> isoformat()).
+      // toISOString() returns UTC, so in eastward timezones (e.g. Europe/Berlin)
+      // local midnight Monday becomes 22:00 Sunday UTC, breaking the lookup.
+      const y  = dt.getFullYear();
+      const m  = String(dt.getMonth() + 1).padStart(2, '0');
+      const d  = String(dt.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
     },
 
     _render() {
       const body = document.getElementById('timeline-body');
       if (!this.schedule) { body.innerHTML = '<div class="empty">Loading…</div>'; return; }
 
-      const slots   = this.schedule.slots || [];
-      const today   = new Date();
-      const dayKeys = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
-      const todayIdx = today.getDay();
-      const ordered  = dayKeys.slice(todayIdx).concat(dayKeys.slice(0, todayIdx));
+      const slots    = this.schedule.slots || [];
+      const today    = new Date();
+      const todayStr = this._isoDate(today);
 
-      const dateFor = {};
-      ordered.forEach((d, i) => {
-        const dt = new Date(today);
-        dt.setDate(today.getDate() + i);
-        dateFor[d] = dt;
+      // assignment lookup: "slot_id|week_start" -> assignment
+      const assignMap = {};
+      (this.assignments || []).forEach(a => {
+        assignMap[a.slot_id + '|' + a.week_start] = a;
       });
 
-      const fmtShort = (d) => d.getDate() + ' ' + d.toLocaleString('en-US', { month: 'short' }).toLowerCase();
-      const last  = dateFor[ordered[6]];
-      const range = `${fmtShort(dateFor[ordered[0]])} — ${fmtShort(last)}, ${last.getFullYear()}`;
+      // calendar grid for viewMonth / viewYear
+      const firstDay    = new Date(this.viewYear, this.viewMonth, 1);
+      const daysInMonth = new Date(this.viewYear, this.viewMonth + 1, 0).getDate();
+      const startPad    = (firstDay.getDay() + 6) % 7;   // Mon=0 … Sun=6
+      const totalCells  = Math.ceil((startPad + daysInMonth) / 7) * 7;
+      const wdNames     = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
 
-      const readyMap = (this.stats && this.stats.final_review && this.stats.final_review.ready_to_post) || {};
-      const ready = {
-        reel:       readyMap.reel     || 0,
-        carousel:   readyMap.carousel || 0,
-        quote_post: (readyMap.story || 0) + (readyMap.story_minimal || 0),
-      };
+      const cellsHtml = [];
+      for (let i = 0; i < totalCells; i++) {
+        const d           = new Date(this.viewYear, this.viewMonth, 1 + (i - startPad));
+        const isThisMonth = d.getMonth() === this.viewMonth;
+        const isToday     = this._isoDate(d) === todayStr;
+        const dayNum      = d.getDate();
+        const wdName      = wdNames[(d.getDay() + 6) % 7];
+        const weekStart   = this._isoDate(this._mondayOf(d));
 
-      const activeSlots   = slots.filter(s => this._isActive(s));
-      const optionalSlots = slots.filter(s => s.optional);
-      const byFmt = {};
-      activeSlots.forEach(s => { byFmt[s.format] = (byFmt[s.format] || 0) + 1; });
+        const pillsHtml = slots
+          .filter(s => s.day === wdName && this._isActive(s))
+          .map(s => {
+            const a       = assignMap[s.id + '|' + weekStart] || null;
+            const label   = s.format === 'quote_post' ? 'story' : s.format;
+            const tipTime = s.time_start || '';
+            if (a) {
+              const tipTitle = a.title ? ' · ' + a.title.slice(0, 38) : '';
+              // Small at-a-glance preview of the assigned post. Images use <img>;
+              // reels (video only) use <video preload="metadata"> so the browser
+              // pulls only the poster frame, not the full file. The wrapper sits
+              // outside the clickable pill so clicking it still bubbles to the
+              // day cell — clicking the pill itself opens the modal.
+              let thumbHtml = '';
+              if (a.thumbnail_url) {
+                thumbHtml = `<img class="tl-cal-thumb" src="/media/${_esc(a.thumbnail_url)}" alt="" loading="lazy">`;
+              } else if (a.video_url) {
+                thumbHtml = `<video class="tl-cal-thumb" src="/media/${_esc(a.video_url)}" muted preload="metadata"></video>`;
+              }
+              return `<div class="tl-cal-slot has-post" data-fmt="${_esc(s.format)}"
+                           onclick="event.stopPropagation();App.timeline.openSlotModal('${_esc(a.id)}')"
+                           title="${_esc(label + ' · ' + tipTime + tipTitle)}">${_esc(label)}</div>${thumbHtml}`;
+            }
+            return `<div class="tl-cal-slot" data-fmt="${_esc(s.format)}"
+                         title="${_esc(label + ' · ' + tipTime + ' · empty')}">${_esc(label)}</div>`;
+          }).join('');
 
-      const optInfo = optionalSlots.length > 0
-        ? `<small>active · ${optionalSlots.length} optional</small>`
-        : '<small>active</small>';
+        const cls = ['tl-cal-day'];
+        if (!isThisMonth) cls.push('other-month');
+        if (isToday)      cls.push('today');
+        cellsHtml.push(`<div class="${cls.join(' ')}"><span class="tl-cal-day-num">${dayNum}</span>${pillsHtml}</div>`);
+      }
 
-      const breakdown = ['reel','carousel','quote_post']
-        .filter(f => byFmt[f])
-        .map(f => {
-          const label = f === 'quote_post' ? 'quote' : f;
-          return byFmt[f] + ' ' + label + (byFmt[f] > 1 ? 's' : '');
-        }).join(' · ');
-
-      const weekHtml = ordered.map(day => {
-        const dt = dateFor[day];
-        const isToday = (dt.toDateString() === today.toDateString());
-        const daySlots = slots.filter(s => s.day === day);
-        const slotsHtml = daySlots.length
-          ? daySlots.map(s => this._slotHtml(s, ready)).join('')
-          : '<div class="tl-day-empty">—</div>';
-        return `
-          <div class="tl-day">
-            <div class="tl-day-head">
-              <div class="tl-day-name ${isToday ? 'today' : ''}">${day}</div>
-              <div class="tl-day-date">${fmtShort(dt)}${isToday ? ' · today' : ''}</div>
-            </div>
-            ${slotsHtml}
-          </div>`;
+      const aheadRows = [
+        { fmt: 'reel',       label: 'Reels',      col: 'var(--reel-col)'     },
+        { fmt: 'carousel',   label: 'Carousels',  col: 'var(--carousel-col)' },
+        { fmt: 'quote_post', label: 'Story posts',col: 'var(--quote-col)'    },
+      ].map(({ fmt, label, col }) => {
+        const n    = (this.weeksAhead || {})[fmt] || 0;
+        const desc = n === 0 ? 'this week only' : n === 1 ? '1 week ahead' : `${n} weeks ahead`;
+        return `<div class="tl-ahead-row">
+          <span class="tl-ahead-dot" style="background:${col}"></span>
+          <span class="tl-ahead-label">${label}</span>
+          <span class="tl-ahead-count ${n > 0 ? 'has-ahead' : ''}">${desc}</span>
+        </div>`;
       }).join('');
 
-      const tz = this.schedule.timezone || 'Europe/Berlin';
+      const monthDate  = new Date(this.viewYear, this.viewMonth, 1);
+      const monthLabel = monthDate.toLocaleString('en-US', { month: 'long' }) + ' ' + this.viewYear;
+      const tz         = this.schedule.timezone || 'Europe/Berlin';
+      const dayHeaders = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+        .map(n => `<div class="tl-cal-weekday">${n}</div>`).join('');
 
       body.innerHTML = `
         <div class="tl-head">
-          <div>
-            <div class="tl-caption">the shape of the week</div>
-          </div>
-          <div class="tl-week-meta">
-            <div class="of">week of</div>
-            <div class="range">${range}</div>
-            <div class="tz">all times · ${_esc(tz)}</div>
+          <div class="tl-caption">content calendar</div>
+          <div class="tl-cal-nav">
+            <button class="tl-cal-nav-btn" onclick="App.timeline.prevMonth()">←</button>
+            <span class="tl-cal-month-label">${_esc(monthLabel)}</span>
+            <button class="tl-cal-nav-btn" onclick="App.timeline.nextMonth()">→</button>
           </div>
         </div>
 
         <div class="tl-main">
-          <div class="tl-week">${weekHtml}</div>
+          <div class="tl-calendar">
+            <div class="tl-cal-weekdays">${dayHeaders}</div>
+            <div class="tl-cal-grid">${cellsHtml.join('')}</div>
+          </div>
 
           <aside class="tl-side">
-            <div class="tl-panel tl-total">
-              <div class="tl-panel-eyebrow">this week</div>
-              <div class="count">${activeSlots.length} ${optInfo}</div>
-              <div class="breakdown">${breakdown || '—'}</div>
+            <div class="tl-panel tl-ahead-panel">
+              <div class="tl-panel-eyebrow">pipeline ahead</div>
+              ${aheadRows}
             </div>
-
             <div class="tl-panel">
               <div class="tl-panel-eyebrow">legend</div>
               <ul class="tl-legend-list">
                 <li>
                   <span class="tl-legend-swatch" style="background:var(--reel-col)"></span>
                   <span class="tl-legend-name">reel</span>
-                  <span class="tl-legend-desc">moving image</span>
+                  <span class="tl-legend-desc">9:16 video</span>
                 </li>
                 <li>
                   <span class="tl-legend-swatch" style="background:var(--carousel-col)"></span>
@@ -1217,74 +1353,189 @@ const App = {
                 </li>
                 <li>
                   <span class="tl-legend-swatch" style="background:var(--quote-col)"></span>
-                  <span class="tl-legend-name">quote</span>
-                  <span class="tl-legend-desc">single line</span>
+                  <span class="tl-legend-name">story post</span>
+                  <span class="tl-legend-desc">single frame</span>
                 </li>
               </ul>
             </div>
-
-            <div class="tl-note">
-              <div class="body">
-                single image and quote posts are sprinkled in only when the line
-                is strong enough to save or send.
-              </div>
-            </div>
-
-            <div class="tl-edit-link">
-              edit this rhythm in <code>tools/rhythm_editor.html</code>
+            <div class="tl-panel">
+              <div class="tl-panel-eyebrow">timezone</div>
+              <div style="font:400 12px var(--sans);color:var(--softer-muted)">${_esc(tz)}</div>
             </div>
           </aside>
         </div>`;
     },
 
-    _slotHtml(slot, ready) {
-      const active = this._isActive(slot);
-      const cls = ['tl-slot'];
-      if (slot.optional) cls.push('optional');
-      if (!active)       cls.push('optional-off');
+    prevMonth() {
+      if (this.viewMonth === 0) { this.viewMonth = 11; this.viewYear--; }
+      else this.viewMonth--;
+      this._render();
+    },
 
-      const fmt      = slot.format;
-      const fmtLabel = fmt === 'quote_post' ? 'quote post' : fmt;
+    nextMonth() {
+      if (this.viewMonth === 11) { this.viewMonth = 0; this.viewYear++; }
+      else this.viewMonth++;
+      this._render();
+    },
 
-      const [hStart] = (slot.time_start || '00:00').split(':').map(n => parseInt(n,10));
-      const [hEnd]   = (slot.time_end   || slot.time_start || '00:00').split(':').map(n => parseInt(n,10));
-      const ampm     = hStart < 12 ? 'am' : 'pm';
-      const endAmpm  = hEnd   < 12 ? 'am' : 'pm';
-      const h12      = ((hStart + 11) % 12) + 1;
-      const hEnd12   = ((hEnd   + 11) % 12) + 1;
-      const range    = (ampm === endAmpm) ? `–${hEnd12} ${ampm}` : `–${hEnd12} ${endAmpm}`;
+    // ── Slot modal — shows assigned post details ────────────────────────
+    openSlotModal(assignmentId) {
+      const a = (this.assignments || []).find(x => x.id === assignmentId);
+      if (!a) return;
 
-      let windowText = '';
-      if (hStart < 11)      windowText = slot.optional ? 'morning · optional' : 'morning';
-      else if (hStart < 14) windowText = 'midday';
-      else if (hStart < 18) windowText = 'afternoon';
-      else                  windowText = slot.optional ? 'evening · optional' : 'evening';
-
-      let badge = '';
-      if (active && ready[fmt] > 0) {
-        ready[fmt] -= 1;
-        const fmtName = fmt === 'quote_post' ? 'quote' : fmt;
-        badge = `<div class="tl-slot-badge">1 ${fmtName} ready</div>`;
+      let lb = document.getElementById('sched-modal');
+      if (!lb) {
+        lb = document.createElement('div');
+        lb.id = 'sched-modal';
+        lb.innerHTML = `
+          <div class="sched-modal-box" onclick="event.stopPropagation()">
+            <button class="sched-modal-close" onclick="App.timeline.closeSlotModal()">✕</button>
+            <div class="sched-modal-fmt" id="sched-fmt"></div>
+            <div class="sched-modal-variant" id="sched-variant"></div>
+            <div class="sched-modal-time" id="sched-time"></div>
+            <div class="sched-modal-thumb-wrap" id="sched-thumb-wrap"></div>
+            <div class="sched-modal-title" id="sched-title"></div>
+            <div class="sched-modal-caption-label">Caption &amp; hashtags</div>
+            <textarea class="sched-modal-caption" id="sched-caption" readonly></textarea>
+            <div class="sched-modal-actions">
+              <button class="btn btn-outline btn-sm" id="sched-copy-btn"
+                      onclick="App.timeline._copyCaption()">Copy caption</button>
+              <button class="btn btn-outline btn-sm" id="sched-files-btn"
+                      onclick="App.timeline.openInFiles()">Open in files</button>
+            </div>
+          </div>`;
+        lb.onclick = () => this.closeSlotModal();
+        document.body.appendChild(lb);
       }
 
-      const toggle = slot.optional
-        ? `<button class="tl-toggle ${active ? 'on' : 'off'}"
-                   title="optional · ${active ? 'on' : 'off'}"
-                   onclick="App.timeline._toggle('${_esc(slot.id)}')"></button>`
-        : '';
+      const fmtLabel = a.format === 'quote_post' ? 'story post' : a.format;
+      const dayStr   = a.slot_day.charAt(0).toUpperCase() + a.slot_day.slice(1);
+      const timeStr  = a.slot_time || '';
 
-      return `
-        <div class="${cls.join(' ')}" data-fmt="${_esc(fmt)}">
-          ${toggle}
-          <div class="tl-slot-fmt-row">
-            <span class="tl-slot-dot"></span>
-            <span class="tl-slot-fmt">${_esc(fmtLabel)}</span>
-          </div>
-          <div class="tl-slot-time">${h12}<span class="ampm">${range}</span></div>
-          <div class="tl-slot-window">${windowText}</div>
-          <div class="tl-slot-label">${_esc(slot.label || '')}</div>
-          ${badge}
-        </div>`;
+      document.getElementById('sched-fmt').textContent    = fmtLabel;
+      document.getElementById('sched-time').textContent   = `${dayStr}  ·  ${timeStr}  ·  week of ${a.week_start}`;
+      document.getElementById('sched-title').textContent  = a.title || '';
+      document.getElementById('sched-caption').value      = a.caption || '';
+
+      const variantEl = document.getElementById('sched-variant');
+      if (variantEl) {
+        const vLabel = a.chosen_variant
+          ? a.chosen_variant.replace('draft_', '').replace('.mp4', '')
+          : '';
+        variantEl.textContent    = vLabel;
+        variantEl.style.display  = vLabel ? '' : 'none';
+      }
+
+      const thumbWrap = document.getElementById('sched-thumb-wrap');
+      if (a.format === 'carousel') {
+        // Carousels store only slide_01 in the assignment. Fetch the full slide
+        // list from the render detail endpoint so the user can preview every
+        // slide before posting. The strip is horizontally scrollable to stay
+        // compact for 3–8 slides; clicking a slide enlarges it in place.
+        thumbWrap.innerHTML = `<div class="sched-modal-slide-loading">Loading slides…</div>`;
+        this._loadCarouselSlides(a, thumbWrap);
+      } else if (a.video_url) {
+        thumbWrap.innerHTML = `<video controls preload="metadata" src="/media/${a.video_url}"></video>`;
+      } else if (a.thumbnail_url) {
+        thumbWrap.innerHTML = `<img src="/media/${a.thumbnail_url}" alt="Post thumbnail">`;
+      } else {
+        thumbWrap.innerHTML = '';
+      }
+
+      // Store current assignment id for copy/open actions
+      lb.dataset.assignId   = a.id;
+      lb.dataset.folderPath = a.folder_path || '';
+
+      lb.classList.add('open');
+    },
+
+    closeSlotModal() {
+      document.getElementById('sched-modal')?.classList.remove('open');
+    },
+
+    _copyCaption() {
+      const ta  = document.getElementById('sched-caption');
+      const btn = document.getElementById('sched-copy-btn');
+      if (!ta || !btn) return;
+      navigator.clipboard.writeText(ta.value).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = 'Copied ✓';
+        setTimeout(() => { btn.textContent = orig; }, 2000);
+      }).catch(() => {
+        ta.select();
+        document.execCommand('copy');
+      });
+    },
+
+    openInFiles() {
+      const lb   = document.getElementById('sched-modal');
+      const btn  = document.getElementById('sched-files-btn');
+      const path = lb?.dataset.folderPath || '';
+      if (!path) return;
+      fetch('/api/open-folder', {
+        method:  'POST',
+        headers: {'Content-Type':'application/json'},
+        body:    JSON.stringify({ path }),
+      }).then(r => {
+        if (r.ok) return;
+        // Surface backend errors (404 folder missing, 403 forbidden, etc.)
+        // so the user knows the click did something, instead of silently
+        // doing nothing. Brief in-button message, then restore.
+        r.json().catch(() => ({})).then(j => {
+          const msg = (j && j.error) ? j.error : 'open failed (' + r.status + ')';
+          console.warn('[openInFiles]', msg, 'path=' + path);
+          if (btn) {
+            const orig = btn.textContent;
+            btn.textContent = msg.length > 24 ? 'Folder missing' : msg;
+            setTimeout(() => { btn.textContent = orig; }, 2200);
+          }
+        });
+      }).catch(err => {
+        console.warn('[openInFiles] network error', err);
+      });
+    },
+
+    // ── Carousel slide loader ──────────────────────────────────────────
+    // Calls /api/renders/<name> for the full slide list referenced by the
+    // assignment, then renders an arrow-navigated single-slide viewer
+    // inside the modal's thumb-wrap div. Independent from the Approve
+    // section slideshow so the two modals can stay open simultaneously
+    // without state collisions.
+    _loadCarouselSlides(a, thumbWrap) {
+      const renderName  = a.render_name || '';
+      const carouselDir = (a.post_key || '').split('/')[1] || '';
+      if (!renderName || !carouselDir) { thumbWrap.innerHTML = ''; return; }
+
+      fetch(`/api/renders/${encodeURIComponent(renderName)}`)
+        .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(detail => {
+          const carousels = detail.carousels || [];
+          const match     = carousels.find(c => c.dir === carouselDir);
+          const slides    = match ? (match.slides || []) : [];
+          if (!slides.length) {
+            thumbWrap.innerHTML = a.thumbnail_url
+              ? `<img src="/media/${_esc(a.thumbnail_url)}" alt="Post thumbnail">`
+              : '<div class="sched-modal-slide-loading">No slides found.</div>';
+            return;
+          }
+          const urls = slides.map(s => s.media_url);
+          thumbWrap.innerHTML = `
+            <div class="sched-slide-viewer">
+              <button class="sched-slide-arrow" id="sched-slide-prev"
+                      onclick="App.timeline.slideshowNav(-1)">‹</button>
+              <img class="sched-slide-img" id="sched-slide-img" src="" alt="Slide">
+              <button class="sched-slide-arrow" id="sched-slide-next"
+                      onclick="App.timeline.slideshowNav(1)">›</button>
+              <div class="sched-slide-counter" id="sched-slide-counter"></div>
+            </div>`;
+          this._openCarouselSlideshow(urls, 0);
+        })
+        .catch(err => {
+          console.warn('[loadCarouselSlides] failed', err);
+          thumbWrap.innerHTML = a.thumbnail_url
+            ? `<img src="/media/${_esc(a.thumbnail_url)}" alt="Post thumbnail">`
+            : '<div class="sched-modal-slide-loading">Could not load slides.</div>';
+        });
     },
   },
 };

@@ -238,6 +238,35 @@ def submit_verdict(name: str, item_key: str | None, verdict: str,
             carousel_dir  = render_path / carousel_name
             if verdict == "postable":
                 dest = _copy_carousel(carousel_dir, name)
+                # Ensure caption.txt exists in the approved folder.
+                # _copy_carousel uses copytree so it's copied if present in
+                # pending. Older carousels that never had a caption.txt in
+                # pending would end up without one in approved — write a
+                # last-resort caption from the manifest theme so downstream
+                # tooling (assignment.caption, schedule modal) always has
+                # something to read.
+                caption_dst = dest / "caption.txt"
+                if not caption_dst.exists():
+                    caption_src = carousel_dir / "caption.txt"
+                    if caption_src.exists():
+                        caption_dst.write_text(
+                            caption_src.read_text(encoding="utf-8"),
+                            encoding="utf-8",
+                        )
+                    else:
+                        theme = ""
+                        mfile = carousel_dir / "manifest.json"
+                        if mfile.exists():
+                            try:
+                                mdata = json.loads(mfile.read_text())
+                                theme = mdata[0].get("text", "")[:80] if mdata else ""
+                            except Exception:
+                                pass
+                        if theme:
+                            caption_dst.write_text(
+                                f"{theme}\n\nSave this for when you need it 🌿\n",
+                                encoding="utf-8",
+                            )
             else:
                 dest = _reject_carousel(carousel_dir, name)
             copied_to = _rel(dest)

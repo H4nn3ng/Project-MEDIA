@@ -14,7 +14,7 @@ from .paths  import BASE_DIR, DATA_DIR, STAGING_DIR, POOL_DIR, AGENT_SCRIPT, CAR
 from .state  import state
 from .runner import launch, stop
 from .media  import serve as serve_media
-from .       import review_api, final_api
+from .       import review_api, final_api, schedule_api
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
@@ -230,6 +230,151 @@ def api_schedule():
     if path.exists():
         return Response(path.read_text(), mimetype="application/json")
     abort(404)
+
+
+def _load_schedule() -> dict:
+    """Load posting_schedule.json, falling back to the built-in default."""
+    path = BASE_DIR / "config" / "posting_schedule.json"
+    if path.exists():
+        try:
+            return json.loads(path.read_text())
+        except Exception:
+            pass
+    return {
+        "timezone": "Europe/Berlin",
+        "slots": [
+            {"id": "sun_reel",     "day": "sunday",    "time_start": "19:00", "time_end": "21:00", "format": "reel",       "label": "wind-down",           "optional": False, "active": True},
+            {"id": "tue_carousel", "day": "tuesday",   "time_start": "07:00", "time_end": "08:00", "format": "carousel",   "label": "save peak",           "optional": False, "active": True},
+            {"id": "wed_quote",    "day": "wednesday", "time_start": "20:00", "time_end": "21:00", "format": "quote_post", "label": "midweek soft moment", "optional": True,  "active": True},
+            {"id": "thu_reel",     "day": "thursday",  "time_start": "19:00", "time_end": "21:00", "format": "reel",       "label": "midweek reach",       "optional": False, "active": True},
+            {"id": "sat_carousel", "day": "saturday",  "time_start": "09:00", "time_end": "10:00", "format": "carousel",   "label": "slow weekend",        "optional": False, "active": True},
+        ],
+    }
+
+
+# ------------------------------------------------------------------ schedule assignments
+
+@app.route("/api/schedule-assignments")
+def api_schedule_assignments_get():
+    return jsonify(schedule_api.load_assignments())
+
+
+@app.route("/api/schedule-assignments", methods=["POST"])
+def api_schedule_assignments_post():
+    data            = request.get_json(force=True) or {}
+    post_key        = data.get("post_key", "").strip()
+    render_name     = data.get("render_name", "").strip()
+    title           = data.get("title", "")
+    thumbnail_url   = data.get("thumbnail_url", "")
+    video_url       = data.get("video_url", "")
+    chosen_variant  = data.get("chosen_variant", "")
+    caption         = data.get("caption", "")
+
+    if not post_key or not render_name:
+        return jsonify({"error": "post_key and render_name are required"}), 400
+
+    assignment = schedule_api.assign_post(
+        post_key, _load_schedule(), render_name, title, thumbnail_url, caption,
+        chosen_variant=chosen_variant, video_url=video_url,
+    )
+    if assignment is None:
+        return jsonify({"error": "no available slots in schedule"}), 409
+    return jsonify(assignment)
+
+
+@app.route("/api/schedule-auto-assign", methods=["POST"])
+def api_schedule_auto_assign():
+    """Retroactively assign approved-but-unscheduled posts to calendar slots."""
+    new_count = schedule_api.auto_assign_approved(_load_schedule())
+    return jsonify({"new_assignments": new_count})
+
+
+@app.route("/api/schedule-assignments/<path:post_key>", methods=["DELETE"])
+def api_schedule_assignments_delete(post_key):
+    removed = schedule_api.unassign_post(post_key)
+    return jsonify({"ok": True, "removed": removed})
+
+
+@app.route("/api/schedule-weeks-ahead")
+def api_schedule_weeks_ahead():
+    return jsonify(schedule_api.weeks_ahead())
+
+
+@app.route("/api/backfill-captions", methods=["POST"])
+def api_backfill_captions():
+    """Write caption.txt to approved carousel folders that are missing it.
+
+    Older approvals copied the carousel before the verdict path ensured
+    caption.txt existed, so some approved folders are missing the file.
+    Pull the assignment.caption field (which the schedule stored at
+    approval time) and write it into the folder so 'Open in files'
+    surfaces it.
+    """
+    assignments = schedule_api.load_assignments()
+    written = 0
+    for a in assignments:
+        if a.get("format") != "carousel":
+            continue
+        fp = a.get("folder_path", "")
+        if not fp:
+            continue
+        folder = (BASE_DIR / fp).resolve()
+        # Security: never write outside the project root, even if a
+        # malformed folder_path tries to traverse upward.
+        if not str(folder).startswith(str(BASE_DIR.resolve())) or not folder.exists():
+            continue
+        caption_file = folder / "caption.txt"
+        if caption_file.exists():
+            continue
+        caption = (a.get("caption") or "").strip()
+        if not caption:
+            # Assignment stored no caption — generate from manifest.json if present.
+            # This covers carousels approved before Gemini caption generation was wired up.
+            manifest = folder / "manifest.json"
+            if manifest.exists():
+                try:
+                    slides = json.loads(manifest.read_text(encoding="utf-8"))
+                    texts  = [s.get("text", "").strip() for s in slides if s.get("text")]
+                    if texts:
+                        hook = texts[0]
+                        caption = (
+                            f"{hook}\n\n"
+                            "Save this for when you need it 🌿\n\n"
+                            "#healing #innerchild #nervoussystem #selfcare "
+                            "#emotionalhealing #mindfulness #anxiety "
+                            "#traumahealing #mentalhealth #selfcompassion"
+                        )
+                except Exception:
+                    pass
+        if caption:
+            try:
+                caption_file.write_text(caption + "\n", encoding="utf-8")
+                written += 1
+            except Exception:
+                pass
+    return jsonify({"written": written})
+
+
+# ------------------------------------------------------------------ open render folder in file manager
+
+@app.route("/api/open-folder", methods=["POST"])
+def api_open_folder():
+    import subprocess
+    data     = request.get_json(force=True) or {}
+    rel_path = data.get("path", "").strip()
+    if not rel_path:
+        return jsonify({"error": "path required"}), 400
+    target = (BASE_DIR / rel_path).resolve()
+    # Security: only allow opening paths inside the project root
+    if not str(target).startswith(str(BASE_DIR.resolve())):
+        return jsonify({"error": "forbidden"}), 403
+    if not target.exists():
+        return jsonify({"error": "folder not found"}), 404
+    try:
+        subprocess.Popen(["xdg-open", str(target)])
+        return jsonify({"ok": True, "path": str(target)})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
 
 
 # ------------------------------------------------------------------ stats
